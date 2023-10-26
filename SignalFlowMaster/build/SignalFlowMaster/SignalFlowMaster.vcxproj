@@ -96,7 +96,12 @@
     <ResourceCompile Include="..\..\res\SignalFlowMaster.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\async_consumer.cpp" />
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\date_time.cpp" />
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\locks.cpp" />
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\log.cpp" />
     <ClCompile Include="..\..\src\labjack_u3_controller.cpp" />
+    <ClCompile Include="..\..\src\labjack_u3_control_ui.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\mainwindow.cpp" />
   </ItemGroup>
@@ -104,9 +109,12 @@
     <QtMoc Include="..\..\include\mainwindow.h" />
   </ItemGroup>
   <ItemGroup>
+    <QtUic Include="..\..\form\labjack_u3_control_ui.ui" />
     <QtUic Include="..\..\form\mainwindow.ui" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\labjack_u3_ctrl_ui_interface.h" />
+    <QtMoc Include="..\..\include\labjack_u3_control_ui.h" />
     <ClInclude Include="..\..\include\labjack_u3_controller.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -21,6 +21,9 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
+    <Filter Include="Source Files\CppToolkit">
+      <UniqueIdentifier>{2f52b36a-ce49-4f64-814b-fdff201463ca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="..\..\res\mainwindow.qrc">
@@ -47,9 +50,27 @@
     <ClCompile Include="..\..\src\labjack_u3_controller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\date_time.cpp">
+      <Filter>Source Files\CppToolkit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\locks.cpp">
+      <Filter>Source Files\CppToolkit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\log.cpp">
+      <Filter>Source Files\CppToolkit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\3rdPartyLibs\CppToolkit\async_consumer.cpp">
+      <Filter>Source Files\CppToolkit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\labjack_u3_control_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="..\..\form\mainwindow.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
+    <QtUic Include="..\..\form\labjack_u3_control_ui.ui">
       <Filter>Form Files</Filter>
     </QtUic>
   </ItemGroup>
@@ -57,9 +78,15 @@
     <QtMoc Include="..\..\include\mainwindow.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="..\..\include\labjack_u3_control_ui.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\labjack_u3_controller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\labjack_u3_ctrl_ui_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
