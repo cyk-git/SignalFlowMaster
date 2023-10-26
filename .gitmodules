@@ -1,0 +1,3 @@
+[submodule "SignalFlowMaster/3rdPartyLibs/CppToolkit"]
+	path = SignalFlowMaster/3rdPartyLibs/CppToolkit
+	url = https://github.com/cyk-git/CppToolkit
