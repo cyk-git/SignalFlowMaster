@@ -2,6 +2,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include <vector>
+
 #include "labjack_u3_controller.h"
 #include "ui_mainwindow.h"
 

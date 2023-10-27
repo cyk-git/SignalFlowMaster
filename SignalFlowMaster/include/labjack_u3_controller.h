@@ -37,26 +37,26 @@ class LabJackU3Controller {
   static const int kNumAIn = 4;
   static const int kNumDOut = 8;
   struct Operation {
-    int duration;                   // 持续时间，以毫秒为单位
-    std::array<bool, kNumDOut> eioStates;  // EIO的8个数字输出电平状态
+    int duration_in_ms;                    // duration time in ms
+    std::array<bool, kNumDOut> eioStates;  // 8 EIO Digital output states
 
     Operation() {
-      duration = 0;
+      duration_in_ms = 0;
       eioStates = {0, 0, 0, 0, 0, 0, 0, 0};
     };
-    Operation(int duration, std::array<bool, kNumDOut> eioStates)
-        : duration(duration), eioStates(eioStates) {}
+    Operation(int duration_in_ms, std::array<bool, kNumDOut> eioStates)
+        : duration_in_ms(duration_in_ms), eioStates(eioStates) {}
   };
 
   struct Protocol {
-    int repetitions;                    // 重复次数
-    std::vector<Operation> operations;  // 包含的Operation序列
-    bool infinite_repetition;
-
+    int repetitions = 0;                    // repetition time
+    std::vector<Operation> operations;  // operations sequence
+    bool infinite_repetition = false;
+    Protocol() = default;
     Protocol(int repetitions, std::vector<Operation> operations,
              bool infinite_repetition = false)
         : repetitions(repetitions),
-          operations(repetitions),
+          operations(operations),
           infinite_repetition(infinite_repetition) {}
   };
 
@@ -117,12 +117,17 @@ class LabJackU3Controller {
   void OpenDevice();
   void CloseDevice();
 
-  void ExecuteOperation(const Operation& operation);
-  void ExecuteProtocol(const Protocol& protocol);
   void ExecuteProtocolList(const std::vector<Protocol>& vec_protocol);
-  void ExecuteProtocolAsync(const Protocol& protocol);
+  //void ExecuteProtocolAsync(const Protocol& protocol);
   void ExecuteProtocolListAsync(const std::vector<Protocol>& vec_protocol);
-  void InterruptProtocol() { flag_execute_protocol_ = false; }
+  void InterruptProtocol() {
+    if (flag_execute_protocol_ == true) {
+      flag_execute_protocol_ = false;
+    }
+    if (th_protocol_.joinable()) {
+      th_protocol_.join();
+    }
+  }
 
   void CollectSignalDataAsync();
   void ResetCounter0();
@@ -158,8 +163,12 @@ class LabJackU3Controller {
   LJ_HANDLE device_handle_ = -1;
   // Protocol
   bool flag_execute_protocol_ = false;
-  std::thread* ptr_th_protocol_ = nullptr;
-  std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
+  std::thread th_protocol_;
+  //std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
+
+  void ExecuteOperation(const Operation& operation);
+  void ExecuteProtocol(const Protocol& protocol);
+
   // Collect Signal Data
   bool flag_collect_data_ = false;
   bool flag_store_data_ = false;
@@ -168,6 +177,7 @@ class LabJackU3Controller {
   std::string store_dir_ = "C:/Experiment/";
   std::string store_name_ = "exp";
   std::string store_format_ = ".h5";
+
   SignalData CollectOneSignalData();
   void CollectSignalData();
 };

@@ -1,11 +1,16 @@
 #include "mainwindow.h"
+
+#include <CppToolkit\q_status_bar_sink.h>
+
 #include <QStandardItemModel>
 #include <iostream>
+
 #include "labjack_u3_control_ui.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindowClass()) {
   ui->setupUi(this);
+  cpptoolkit::AddQStatusBarSink(statusBar());
 }
 
 MainWindow::~MainWindow() { delete ui; }
@@ -20,7 +25,7 @@ void MainWindow::FindDevice() {
   ui->treeView_devices->setModel(model);
   QStandardItem* header1 = new QStandardItem("Device");
   model->setHorizontalHeaderItem(0, header1);
-  
+
   // 填充model
   for (size_t i = 0; i < vec_device_info_.size(); ++i) {
     const signal_flow_master::DeviceInfo& deviceInfo = vec_device_info_[i];
@@ -39,12 +44,12 @@ void MainWindow::FindDevice() {
     indexItem->setEditable(false);
 
     //// 如果还需要添加infos里面的信息作为第三级
-    //for (const auto& [key, value] : deviceInfo.infos) {
-    //  QStandardItem* keyItem = new QStandardItem(QString::fromStdString(key));
-    //  QStandardItem* valueItem =
-    //      new QStandardItem(QString::fromStdString(value));
-    //  indexItem->appendRow({keyItem, valueItem});
-    //}
+    // for (const auto& [key, value] : deviceInfo.infos) {
+    //   QStandardItem* keyItem = new
+    //   QStandardItem(QString::fromStdString(key)); QStandardItem* valueItem =
+    //       new QStandardItem(QString::fromStdString(value));
+    //   indexItem->appendRow({keyItem, valueItem});
+    // }
   }
 
   ui->progressBar_findDevices->setValue(100);
@@ -81,7 +86,7 @@ void MainWindow::on_treeView_devices_clicked(const QModelIndex& index) {
 
   if (item->data().isValid()) {
     int index = item->data().toInt();
-    //std::cout << "Open: " << item->data().toInt();
+    // std::cout << "Open: " << item->data().toInt();
 
     QStandardItemModel* model = new QStandardItemModel();
     int row = 0;
@@ -108,8 +113,6 @@ void MainWindow::on_treeView_devices_clicked(const QModelIndex& index) {
     ui->tableView_deviceInfo->setEnabled(false);
     ui->pushButton_openDevice->setEnabled(false);
   }
-
-  
 }
 
 void MainWindow::on_pushButton_openDevice_clicked() {

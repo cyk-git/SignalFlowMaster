@@ -57,6 +57,8 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="$(QtMsBuild)\Qt.props" />
     <Import Project="..\..\props\StdProjectDir.props" />
+    <Import Project="..\..\props\HDF5.props" />
+    <Import Project="..\..\props\LabJack.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
@@ -105,6 +107,8 @@
     <ClCompile Include="..\..\src\labjack_u3_control_ui.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\mainwindow.cpp" />
+    <ClCompile Include="..\..\src\operation_ui.cpp" />
+    <ClCompile Include="..\..\src\protocol_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="..\..\include\mainwindow.h" />
@@ -112,9 +116,13 @@
   <ItemGroup>
     <QtUic Include="..\..\form\labjack_u3_control_ui.ui" />
     <QtUic Include="..\..\form\mainwindow.ui" />
+    <QtUic Include="..\..\form\operation_ui.ui" />
+    <QtUic Include="..\..\form\protocol_ui.ui" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\labjack_u3_ctrl_ui_interface.h" />
+    <QtMoc Include="..\..\include\protocol_ui.h" />
+    <QtMoc Include="..\..\include\operation_ui.h" />
     <QtMoc Include="..\..\include\labjack_u3_control_ui.h" />
     <ClInclude Include="..\..\include\labjack_u3_controller.h" />
   </ItemGroup>

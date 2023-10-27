@@ -1,9 +1,10 @@
 #include "labjack_u3_controller.h"
+
 #include <CppToolkit\date_time.h>
 
 namespace signal_flow_master {
-void LabJackU3Controller::SignalDataStorer::
-    StoreSignalDataAsync(const SignalData& data) {
+void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
+    const SignalData& data) {
   PreGetData();
   try {
     if (!flag_handling_error_) {
@@ -61,14 +62,13 @@ void LabJackU3Controller::SignalDataStorer::Close() {
   file_.close();
 }
 
-void LabJackU3Controller::SignalDataStorer::
-    LoadDataForProcess() {
+void LabJackU3Controller::SignalDataStorer::LoadDataForProcess() {
   loaded_data_ = std::move(queue_data_buffer_.front());
   queue_data_buffer_.pop();
 }
 
 void LabJackU3Controller::SignalDataStorer::ProcessData() {
-  //LOG_DEBUG("[Consumer Process]First elem: {}", loaded_data_->ain_votage[0]);
+  // LOG_DEBUG("[Consumer Process]First elem: {}", loaded_data_->ain_votage[0]);
   const auto& data = *loaded_data_;
   // Increase dataset size
   dims_[0]++;
@@ -111,11 +111,9 @@ void LabJackU3Controller::SignalDataStorer::ProcessData() {
   H5::DataSpace memspaceState(2, countState);
   dataset_states_.write(data.eio_states.data(), H5::PredType::NATIVE_HBOOL,
                         memspaceState, spaceState);
-
 }
 
-void LabJackU3Controller::SignalDataStorer::
-    ClearDataBuffer() {
+void LabJackU3Controller::SignalDataStorer::ClearDataBuffer() {
   queue_data_buffer_ = std::queue<std::unique_ptr<SignalData>>();
 }
 
@@ -157,7 +155,6 @@ std::vector<DeviceInfo> LabJackU3Controller::FindAllDevices() {
   return result;
 }
 
-
 void LabJackU3Controller::OpenDevice() {
   if (flag_open_) {
     LOG_WARN("LabJack U3 {} have already been opened!", kAddress_);
@@ -181,9 +178,7 @@ void LabJackU3Controller::OpenDevice() {
   // The ePut function is used, which combines the add/go/get.
   errorCode = ePut(device_handle_, LJ_ioPIN_CONFIGURATION_RESET, 0, 0, 0);
   if (errorCode != LJE_NOERROR) {
-    LOG_ERROR(
-        "ePut function returned an error: {}",
-        kAddress_, errorCode);
+    LOG_ERROR("ePut function returned an error: {}", kAddress_, errorCode);
     CPPTOOLKIT_THROW_EXCEPTION(
         std::runtime_error("ePut function returned an error: " +
                            std::to_string(errorCode)),
@@ -191,8 +186,7 @@ void LabJackU3Controller::OpenDevice() {
   }
   // Set the pin offset to 4.
   AddRequest(device_handle_, LJ_ioPUT_CONFIG, LJ_chTIMER_COUNTER_PIN_OFFSET, 4,
-             0,
-             0);
+             0, 0);
   if (errorCode != LJE_NOERROR) {
     LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
               errorCode);
@@ -213,9 +207,7 @@ void LabJackU3Controller::OpenDevice() {
   }
   errorCode = GoOne(device_handle_);
   if (errorCode != LJE_NOERROR) {
-    LOG_ERROR(
-        "GoOne function returned an error: {}",
-        kAddress_, errorCode);
+    LOG_ERROR("GoOne function returned an error: {}", kAddress_, errorCode);
     CPPTOOLKIT_THROW_EXCEPTION(
         std::runtime_error("GoOne function returned an error: " +
                            std::to_string(errorCode)),
@@ -224,13 +216,12 @@ void LabJackU3Controller::OpenDevice() {
   ResetCounter0();
 
   flag_open_ = true;
-  
-  set_store_data(true);
-  //CollectSignalDataAsync();
-  //std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-  //StopCollectData();
-}
 
+  set_store_data(true);//TODO
+  // CollectSignalDataAsync();
+  //
+  // StopCollectData();
+}
 
 void LabJackU3Controller::CloseDevice() {
   if (!flag_open_) {
@@ -240,23 +231,84 @@ void LabJackU3Controller::CloseDevice() {
   InterruptProtocol();
   StopCollectData();
   device_handle_ = -1;
-  LOG_INFO("Close LabJack-U3 {}",kAddress_);
+  LOG_INFO("Close LabJack-U3 {}", kAddress_);
 }
 
+void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
+  LJ_ERROR errorCode;
+  for (int i = 0; i < 8; i++) {
+    if (!flag_execute_protocol_) {
+      return;
+    }
+    errorCode = eDO(device_handle_, i + 8, operation.eioStates[i]);
+    //errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_BIT,i + 8, operation.eioStates[i],0,0);
+    LOG_TRACE("Set EIO{} to {}",i, operation.eioStates[i]);
+    if (errorCode != LJE_NOERROR) {
+      LOG_ERROR("eDO function returned an error: {}", kAddress_, errorCode);
+      CPPTOOLKIT_THROW_EXCEPTION(
+          std::runtime_error("eDO function returned an error: " +
+                             std::to_string(errorCode)),
+          cpptoolkit::ErrorLevel::E_ERROR);
+    }
+    //eio_states_[i] = operation.eioStates[i];
+  }
+  std::this_thread::sleep_for(
+      std::chrono::milliseconds(operation.duration_in_ms));
+}
+
+void LabJackU3Controller::ExecuteProtocol(const Protocol& protocol) {
+  for (int r = 0; r < protocol.repetitions || protocol.infinite_repetition;
+       r++) {
+    for (const auto& op : protocol.operations) {
+      if (!flag_execute_protocol_) {
+        return;
+      }
+      ExecuteOperation(op);
+    }
+  }
+}
+
+void LabJackU3Controller::ExecuteProtocolList(
+    const std::vector<Protocol>& vec_protocol) {
+  flag_execute_protocol_ = true;
+  for (const auto& protocol : vec_protocol) {
+    if (!flag_execute_protocol_) {
+      break;
+    }
+    ExecuteProtocol(protocol);
+  }
+  flag_execute_protocol_ = false;
+}
+
+// void LabJackU3Controller::ExecuteProtocolAsync(const Protocol& protocol) {
+//   if (flag_execute_protocol_) {
+//     LOG_WARN("A protocol is already in execution.");
+//     return;
+//   }
+//   flag_execute_protocol_ = true;
+//   th_protocol_ =
+//       std::thread(&LabJackU3Controller::ExecuteProtocol, this, protocol);
+// }
+
 void LabJackU3Controller::ExecuteProtocolListAsync(
-    const std::vector<Protocol>& vec_protocol) {}
+    const std::vector<Protocol>& vec_protocol) {
+  if (th_protocol_.joinable()) {
+    LOG_WARN("A protocol is already in execution.");
+    return;
+  }
+  th_protocol_ = std::thread(&LabJackU3Controller::ExecuteProtocolList, this,
+                             vec_protocol);
+}
 
 LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   SignalData data;
   LJ_ERROR errorCode = -1;
   // Add request to get AIN0-3 votage
   for (int i = 0; i < kNumAIn; i++) {
-    errorCode =
-        AddRequest(device_handle_, LJ_ioGET_AIN, i, 0, 0, 0);
+    errorCode = AddRequest(device_handle_, LJ_ioGET_AIN, i, 0, 0, 0);
     if (errorCode != LJE_NOERROR) {
-      LOG_ERROR(
-          "AddRequest function returned an error: {}",
-          kAddress_, errorCode);
+      LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
+                errorCode);
       CPPTOOLKIT_THROW_EXCEPTION(
           std::runtime_error("AddRequest function returned an error: " +
                              std::to_string(errorCode)),
@@ -266,26 +318,39 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   // Add request to get counter0
   errorCode = AddRequest(device_handle_, LJ_ioGET_COUNTER, 0, 0, 0, 0);
   if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_, errorCode);
+    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
+              errorCode);
     CPPTOOLKIT_THROW_EXCEPTION(
         std::runtime_error("AddRequest function returned an error: " +
                            std::to_string(errorCode)),
         cpptoolkit::ErrorLevel::E_ERROR);
   }
-
+  // Add request to get EIO0-8 votage
+  for (int i = 0; i < kNumDOut; i++) {
+    errorCode =
+        AddRequest(device_handle_, LJ_ioGET_DIGITAL_BIT_STATE, i+8, 0, 0, 0);
+    if (errorCode != LJE_NOERROR) {
+      LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
+                errorCode);
+      CPPTOOLKIT_THROW_EXCEPTION(
+          std::runtime_error("AddRequest function returned an error: " +
+                             std::to_string(errorCode)),
+          cpptoolkit::ErrorLevel::E_ERROR);
+    }
+  }
   // Get data from LabJack
   auto now = std::chrono::high_resolution_clock::now();
   errorCode = GoOne(device_handle_);
   if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GoOne function returned an error: {}", kAddress_,
-              errorCode);
+    LOG_ERROR("GoOne function returned an error: {}", kAddress_, errorCode);
     CPPTOOLKIT_THROW_EXCEPTION(
         std::runtime_error("GoOne function returned an error: " +
                            std::to_string(errorCode)),
         cpptoolkit::ErrorLevel::E_ERROR);
   }
   data.timepoint = now;
-  data.eio_states = eio_states_;
+  // data.eio_states = eio_states_;
+  double eio_state_temp;
 
   // Fill data into SignalData "data"
   for (int i = 0; i < kNumAIn; i++) {
@@ -301,14 +366,26 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   }
   errorCode = GetResult(device_handle_, LJ_ioGET_COUNTER, 0, &data.count);
   if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GetResult function returned an error: {}", kAddress_,
-              errorCode);
+    LOG_ERROR("GetResult function returned an error: {}", kAddress_, errorCode);
     CPPTOOLKIT_THROW_EXCEPTION(
         std::runtime_error("GetResult function returned an error: " +
                            std::to_string(errorCode)),
         cpptoolkit::ErrorLevel::E_ERROR);
   }
-  //LOG_TRACE("Counter:{}", data.count);
+  for (int i = 0; i < kNumDOut; i++) {
+    errorCode = GetResult(device_handle_, LJ_ioGET_DIGITAL_BIT_STATE, i + 8,
+                          &eio_state_temp);
+    data.eio_states[i] = static_cast<bool>(eio_state_temp);
+    if (errorCode != LJE_NOERROR) {
+      LOG_ERROR("GetResult function returned an error: {}", kAddress_,
+                errorCode);
+      CPPTOOLKIT_THROW_EXCEPTION(
+          std::runtime_error("GetResult function returned an error: " +
+                             std::to_string(errorCode)),
+          cpptoolkit::ErrorLevel::E_ERROR);
+    }
+  }
+  // LOG_TRACE("Counter:{}", data.count);
   return data;
 }
 
@@ -317,21 +394,31 @@ void LabJackU3Controller::CollectSignalData() {
   SignalDataStorer storer(store_dir_ + cpptoolkit::DateTime().date_time() +
                           "_" + store_name_ + store_format_);
   storer.Init();
-  //LOG_INFO(full_path.string());
+  // LOG_INFO(full_path.string());
   flag_collect_data_ = true;
-  while (flag_collect_data_) {
-    current_data = CollectOneSignalData();
-    if (flag_display_data_) {
-      // DisplayAsync
+  try {
+    while (flag_collect_data_) {
+      current_data = CollectOneSignalData();
+      LOG_TRACE("AIN0 {}", current_data.ain_votage[0]);
+      if (flag_display_data_) {
+        // DisplayAsync
+      }
+      if (flag_store_data_) {
+        storer.StoreSignalDataAsync(current_data);
+      }
     }
-    if (flag_store_data_) {
-      storer.StoreSignalDataAsync(current_data);
-    }
+  } catch (...) {
+    LOG_ERROR("Unknown exception caught. Signal Collection End.");
   }
+
   ptr_ui_->CollectSignalDataEnded();
 }
 
-void LabJackU3Controller::CollectSignalDataAsync() { 
+void LabJackU3Controller::CollectSignalDataAsync() {
+  if (th_data_.joinable()) {
+    LOG_WARN("The device is currently collecting signal data.");
+    return;
+  }
   th_data_ = std::thread(&LabJackU3Controller::CollectSignalData, this);
 }
 
@@ -387,9 +474,5 @@ void LabJackU3Controller::ResetCounter0() {
                            std::to_string(errorCode)),
         cpptoolkit::ErrorLevel::E_ERROR);
   }
-
 }
-
 }  // namespace signal_flow_master
-
-

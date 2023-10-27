@@ -65,6 +65,12 @@
     <ClCompile Include="..\..\src\labjack_u3_control_ui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\operation_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\protocol_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="..\..\form\mainwindow.ui">
@@ -73,12 +79,24 @@
     <QtUic Include="..\..\form\labjack_u3_control_ui.ui">
       <Filter>Form Files</Filter>
     </QtUic>
+    <QtUic Include="..\..\form\operation_ui.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
+    <QtUic Include="..\..\form\protocol_ui.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="..\..\include\mainwindow.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="..\..\include\labjack_u3_control_ui.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="..\..\include\operation_ui.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="..\..\include\protocol_ui.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

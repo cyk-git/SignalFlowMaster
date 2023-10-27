@@ -67,7 +67,7 @@
 //
 //
 //Protocol getUserInput() {
-//  int numOps, rep, duration;
+//  int numOps, rep, duration_in_ms;
 //  std::array<bool, 8> states;
 //
 //  std::cout << "Enter the number of operations: ";
@@ -79,15 +79,15 @@
 //  std::vector<Operation> ops;
 //
 //  for (int i = 0; i < numOps; i++) {
-//    std::cout << "Enter the duration for operation " << i + 1 << ": ";
-//    std::cin >> duration;
+//    std::cout << "Enter the duration_in_ms for operation " << i + 1 << ": ";
+//    std::cin >> duration_in_ms;
 //
 //    std::cout << "Enter the 8 EIO states (0 or 1) separated by spaces: ";
 //    for (int j = 0; j < 8; j++) {
 //      std::cin >> states[j];
 //    }
 //
-//    ops.push_back(Operation(duration, states));
+//    ops.push_back(Operation(duration_in_ms, states));
 //  }
 //
 //  return Protocol(rep, ops);
@@ -117,7 +117,7 @@
 //      }
 //
 //      // 等待指定的持续时间
-//      std::this_thread::sleep_for(std::chrono::milliseconds(op.duration));
+//      std::this_thread::sleep_for(std::chrono::milliseconds(op.duration_in_ms));
 //
 //      // 重置EIO状态（如果需要）可以在这里添加代码
 //    }
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   cpptoolkit::InitLogger("logs", cpptoolkit::GetLogFileName("_log.txt"),
-                   spdlog::level::trace);
+                   spdlog::level::trace,spdlog::level::info);
   MainWindow w;
   w.show();
   w.FindDevice();

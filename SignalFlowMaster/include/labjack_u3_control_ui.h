@@ -19,6 +19,7 @@ class LabJackU3ControlUI : public QMainWindow,
   Q_OBJECT
 
  public:
+  using Protocol = signal_flow_master::LabJackU3Controller::Protocol;
   LabJackU3ControlUI(const std::string &address, MainWindow *parent = nullptr);
   ~LabJackU3ControlUI();
 
@@ -34,11 +35,19 @@ class LabJackU3ControlUI : public QMainWindow,
   void StartCollectSignal();
   void StopCollectSignal();
 
+  void AddProtocol();
+  Protocol GetProtocol(int row);
+  std::vector<Protocol> GetAllProtocol();
+  void RunProtocolListAsync(const std::vector<Protocol>& vec_protocol);
+
  private slots:
   void on_pushButton_storePath_clicked();
   void on_pushButton_collect_clicked();
   void on_pushButton_reset_clicked();
-
+  void on_pushButton_add_clicked();
+  void on_pushButton_runAll_clicked();
+  void DeleteProtocol(int row);
+  void Run(int row);
 
  private:
   MainWindow *ptr_mainwindow;
