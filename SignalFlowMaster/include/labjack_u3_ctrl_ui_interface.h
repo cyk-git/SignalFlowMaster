@@ -22,6 +22,8 @@ class LabJackU3CtrlUIInterface {
   LabJackU3CtrlUIInterface(LabJackU3CtrlUIInterface&&) = delete;
   LabJackU3CtrlUIInterface& operator=(LabJackU3CtrlUIInterface&&) = delete;
 
+  virtual void CollectSignalDataEnded()=0;
+
   // Define interface methods here
   //virtual void ShowUI() = 0;
   //virtual void UpdateStatus() = 0;

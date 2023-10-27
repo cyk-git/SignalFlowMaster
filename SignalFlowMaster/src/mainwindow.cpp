@@ -58,8 +58,8 @@ void MainWindow::OpenDevice(const std::string& address) {
     return;
   }
   LabJackU3ControlUI* labjack_ui = new LabJackU3ControlUI(address, this);
-  labjack_ui->setAttribute(Qt::WA_DeleteOnClose, true);
   labjack_ui->show();
+  labjack_ui->setAttribute(Qt::WA_DeleteOnClose, true);
   labjack_ui->OpenDevice();
   opened_addresses_.push_back(address);
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <HDF5>$(HDF5_PATH)\</HDF5>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ExternalIncludePath>$(HDF5)include;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>$(HDF5)lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="HDF5">
+      <Value>$(HDF5)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

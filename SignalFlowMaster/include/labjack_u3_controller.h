@@ -22,6 +22,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <H5Cpp.h>
 
 #include "labjack_u3_ctrl_ui_interface.h"
 
@@ -33,15 +34,17 @@ struct DeviceInfo {
 
 class LabJackU3Controller {
  public:  // Define Structs
+  static const int kNumAIn = 4;
+  static const int kNumDOut = 8;
   struct Operation {
     int duration;                   // 持续时间，以毫秒为单位
-    std::array<bool, 8> eioStates;  // EIO的8个数字输出电平状态
+    std::array<bool, kNumDOut> eioStates;  // EIO的8个数字输出电平状态
 
     Operation() {
       duration = 0;
       eioStates = {0, 0, 0, 0, 0, 0, 0, 0};
     };
-    Operation(int duration, std::array<bool, 8> eioStates)
+    Operation(int duration, std::array<bool, kNumDOut> eioStates)
         : duration(duration), eioStates(eioStates) {}
   };
 
@@ -59,9 +62,9 @@ class LabJackU3Controller {
 
   struct SignalData {
     std::chrono::time_point<std::chrono::high_resolution_clock> timepoint;
-    std::array<double, 4> ain_votage;
-    std::array<bool, 8> eio_states;
-    uint64_t count;
+    std::array<double, kNumAIn> ain_votage;
+    std::array<bool, kNumDOut> eio_states;
+    double count;
   };
 
   class SignalDataStorer : public cpptoolkit::AsyncConsumer {
@@ -82,8 +85,9 @@ class LabJackU3Controller {
     std::unique_ptr<SignalData> loaded_data_ = nullptr;
     const std::string kStorePath_;
 
-    virtual void ConsumerLoop() { LOG_DEBUG("test"); }
-
+    //virtual void ConsumerLoop() { LOG_DEBUG("test"); }
+    virtual void Start();
+    virtual void Close();
     virtual void LoadDataForProcess();
     virtual void ProcessData();
     virtual void ClearDataBuffer();
@@ -91,12 +95,18 @@ class LabJackU3Controller {
     virtual bool is_data_buffer_empty() { return queue_data_buffer_.empty(); }
 
    private:
-    void GetData(std::unique_ptr<int[]> data_ptr);
+    H5::H5File file_;
+    H5::DataSet dataset_time_;
+    H5::DataSet dataset_voltage_;
+    H5::DataSet dataset_states_;
+    H5::DataSet dataset_count_;
+    hsize_t dims_[1] = {0};
+   // void GetData(std::unique_ptr<int[]> data_ptr);
   };
 
  public:
-  explicit LabJackU3Controller(const std::string& address)
-      : kAddress_(address) {}
+  explicit LabJackU3Controller(const std::string& address, LabJackU3CtrlUIInterface* ptr_ui)
+      : kAddress_(address), ptr_ui_(ptr_ui) {}
   ~LabJackU3Controller() { CloseDevice(); }
   // Disallow copy and move
   LabJackU3Controller(const LabJackU3Controller&) = delete;
@@ -114,16 +124,32 @@ class LabJackU3Controller {
   void ExecuteProtocolListAsync(const std::vector<Protocol>& vec_protocol);
   void InterruptProtocol() { flag_execute_protocol_ = false; }
 
-  SignalData CollectOneSignalData();
-  void CollectSignalData();
   void CollectSignalDataAsync();
+  void ResetCounter0();
   void set_store_data(bool store) { flag_store_data_ = store; }
   void set_display_data(bool display) { flag_display_data_ = display; }
-  void StopCollectData() { flag_collect_data_ = false; }
+  void StopCollectData() {
+    if (flag_collect_data_ == true) {
+      flag_collect_data_ = false;
+      if (th_data_.joinable()) {
+        th_data_.join();
+      }
+    }
+  }
+  void set_store_path(std::string store_dir, std::string store_name,
+                      std::string store_format) {
+    store_dir_ = store_dir;
+    store_name_ = store_name;
+    store_format_ = store_format;
+  }
+  std::string get_store_path() {
+    return store_dir_ + store_name_ + store_format_;
+  }
 
   static std::vector<DeviceInfo> FindAllDevices();
 
  private:
+  LabJackU3CtrlUIInterface* ptr_ui_;
   const long kDeviceType_ = LJ_dtU3;
   const long kConnectionType_ = LJ_ctUSB;
   const std::string kAddress_;
@@ -133,12 +159,17 @@ class LabJackU3Controller {
   // Protocol
   bool flag_execute_protocol_ = false;
   std::thread* ptr_th_protocol_ = nullptr;
-  std::array<bool, 8> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
+  std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
   // Collect Signal Data
   bool flag_collect_data_ = false;
   bool flag_store_data_ = false;
   bool flag_display_data_ = false;
-  std::thread* ptr_th_data_ = nullptr;
+  std::thread th_data_;
+  std::string store_dir_ = "C:/Experiment/";
+  std::string store_name_ = "exp";
+  std::string store_format_ = ".h5";
+  SignalData CollectOneSignalData();
+  void CollectSignalData();
 };
 }  // namespace signal_flow_master
 
