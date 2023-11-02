@@ -178,6 +178,7 @@
 int main(int argc, char *argv[]) {
   using namespace signal_flow_master;
   QApplication a(argc, argv);
+  a.setWindowIcon(QIcon(":/image/logo"));
   // Enable console to debug
 #ifdef ENABLE_CONSOLE_
   if (AllocConsole()) {
@@ -195,7 +196,7 @@ int main(int argc, char *argv[]) {
 
   cpptoolkit::InitLogger("logs", cpptoolkit::GetLogFileName("_log.txt"),
                    spdlog::level::trace,spdlog::level::info);
-  MainWindow w;
+  BrowseDeviceUI w;
   w.show();
   w.FindDevice();
   return a.exec();

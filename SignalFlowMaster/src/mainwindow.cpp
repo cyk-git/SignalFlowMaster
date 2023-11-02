@@ -7,15 +7,20 @@
 
 #include "labjack_u3_control_ui.h"
 
-MainWindow::MainWindow(QWidget* parent)
+std::vector<std::string> BrowseDeviceUI::opened_addresses_;
+
+BrowseDeviceUI::BrowseDeviceUI(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::MainWindowClass()) {
   ui->setupUi(this);
-  cpptoolkit::AddQStatusBarSink(statusBar());
+  ::cpptoolkit::AddQStatusBarSink(statusBar());
 }
 
-MainWindow::~MainWindow() { delete ui; }
+BrowseDeviceUI::~BrowseDeviceUI() {
+  ::cpptoolkit::RemoveStatusBarSink(statusBar());
+  delete ui;
+}
 
-void MainWindow::FindDevice() {
+void BrowseDeviceUI::FindDevice() {
   ui->progressBar_findDevices->setValue(0);
   vec_device_info_ = signal_flow_master::LabJackU3Controller::FindAllDevices();
   ui->progressBar_findDevices->setValue(90);
@@ -55,21 +60,21 @@ void MainWindow::FindDevice() {
   ui->progressBar_findDevices->setValue(100);
 }
 
-void MainWindow::OpenDevice(const std::string& address) {
+void BrowseDeviceUI::OpenDevice(const std::string& address) {
   auto it =
       std::find(opened_addresses_.begin(), opened_addresses_.end(), address);
   if (it != opened_addresses_.end()) {
     LOG_WARN("Device {} have already been opened!", address);
     return;
   }
-  LabJackU3ControlUI* labjack_ui = new LabJackU3ControlUI(address, this);
+  LabJackU3ControlUI* labjack_ui = new LabJackU3ControlUI(address, nullptr);
   labjack_ui->show();
   labjack_ui->setAttribute(Qt::WA_DeleteOnClose, true);
   labjack_ui->OpenDevice();
   opened_addresses_.push_back(address);
 }
 
-void MainWindow::DeviceClosed(const std::string& address) {
+void BrowseDeviceUI::DeviceClosed(const std::string& address) {
   auto it =
       std::find(opened_addresses_.begin(), opened_addresses_.end(), address);
 
@@ -79,7 +84,7 @@ void MainWindow::DeviceClosed(const std::string& address) {
   }
 }
 
-void MainWindow::on_treeView_devices_clicked(const QModelIndex& index) {
+void BrowseDeviceUI::on_treeView_devices_clicked(const QModelIndex& index) {
   QStandardItemModel* model =
       qobject_cast<QStandardItemModel*>(ui->treeView_devices->model());
   QStandardItem* item = model->itemFromIndex(index);
@@ -115,8 +120,8 @@ void MainWindow::on_treeView_devices_clicked(const QModelIndex& index) {
   }
 }
 
-void MainWindow::on_pushButton_openDevice_clicked() {
+void BrowseDeviceUI::on_pushButton_openDevice_clicked() {
   OpenDevice(current_device_address_);
 }
 
-void MainWindow::on_pushButton_findDevices_clicked() { FindDevice(); }
+void BrowseDeviceUI::on_pushButton_findDevices_clicked() { FindDevice(); }

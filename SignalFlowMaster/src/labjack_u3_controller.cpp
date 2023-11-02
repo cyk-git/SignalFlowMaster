@@ -162,62 +162,41 @@ void LabJackU3Controller::OpenDevice() {
   }
   LJ_ERROR errorCode = OpenLabJack(kDeviceType_, kConnectionType_,
                                    kAddress_.c_str(), false, &device_handle_);
+  CHECK_LABJACK_API_ERROR(errorCode, "OpenLabJcak " + kAddress_, kDefaultLevel);
   LOG_INFO("Open LabJack-U3 {}", kAddress_);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR(
-        "Can't open LabJack U3 {}! OpenLabJack function returned an error: {}",
-        kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("OpenLabJack function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  // if (errorCode != LJE_NOERROR) {
+  //   LOG_ERROR(
+  //       "Can't open LabJack U3 {}! OpenLabJack function returned an error:
+  //       {}", kAddress_, errorCode);
+  //   CPPTOOLKIT_THROW_EXCEPTION(
+  //       std::runtime_error("OpenLabJack function returned an error: " +
+  //                          std::to_string(errorCode)),
+  //       cpptoolkit::ErrorLevel::E_ERROR);
+  // }
 
   // Execute the pin_configuration_reset IOType so that all
   // pin assignments are in the factory default condition.
   // The ePut function is used, which combines the add/go/get.
   errorCode = ePut(device_handle_, LJ_ioPIN_CONFIGURATION_RESET, 0, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("ePut function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("ePut function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "LJ_ioPIN_CONFIGURATION_RESET ",
+                          kDefaultLevel);
   // Set the pin offset to 4.
   AddRequest(device_handle_, LJ_ioPUT_CONFIG, LJ_chTIMER_COUNTER_PIN_OFFSET, 4,
              0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-              errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("AddRequest function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode,
+                          "LJ_ioPUT_CONFIG->LJ_chTIMER_COUNTER_PIN_OFFSET ",
+                          kDefaultLevel);
   // Enable Counter1. It will use FIO4.
   errorCode = AddRequest(device_handle_, LJ_ioPUT_COUNTER_ENABLE, 0, 1, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-              errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("AddRequest function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "LJ_ioPUT_COUNTER_ENABLE ", kDefaultLevel);
+
   errorCode = GoOne(device_handle_);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GoOne function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GoOne function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GoOne for LabJack Init ", kDefaultLevel);
   ResetCounter0();
 
   flag_open_ = true;
 
-  set_store_data(true);//TODO
+  set_store_data(true);  // TODO
   // CollectSignalDataAsync();
   //
   // StopCollectData();
@@ -241,16 +220,12 @@ void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
       return;
     }
     errorCode = eDO(device_handle_, i + 8, operation.eioStates[i]);
-    //errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_BIT,i + 8, operation.eioStates[i],0,0);
-    LOG_TRACE("Set EIO{} to {}",i, operation.eioStates[i]);
-    if (errorCode != LJE_NOERROR) {
-      LOG_ERROR("eDO function returned an error: {}", kAddress_, errorCode);
-      CPPTOOLKIT_THROW_EXCEPTION(
-          std::runtime_error("eDO function returned an error: " +
-                             std::to_string(errorCode)),
-          cpptoolkit::ErrorLevel::E_ERROR);
-    }
-    //eio_states_[i] = operation.eioStates[i];
+    // errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_BIT,i + 8,
+    // operation.eioStates[i],0,0);
+    CHECK_LABJACK_API_ERROR(errorCode, "eDo for ExecuteOperation ",
+                            kDefaultLevel);
+    LOG_TRACE("Set EIO{} to {}", i, operation.eioStates[i]);
+    // eio_states_[i] = operation.eioStates[i];
   }
   std::this_thread::sleep_for(
       std::chrono::milliseconds(operation.duration_in_ms));
@@ -306,48 +281,25 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   // Add request to get AIN0-3 votage
   for (int i = 0; i < kNumAIn; i++) {
     errorCode = AddRequest(device_handle_, LJ_ioGET_AIN, i, 0, 0, 0);
-    if (errorCode != LJE_NOERROR) {
-      LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-                errorCode);
-      CPPTOOLKIT_THROW_EXCEPTION(
-          std::runtime_error("AddRequest function returned an error: " +
-                             std::to_string(errorCode)),
-          cpptoolkit::ErrorLevel::E_ERROR);
-    }
+    CHECK_LABJACK_API_ERROR(errorCode, "Add request to get AIN0-3 votage ",
+                            kDefaultLevel);
   }
   // Add request to get counter0
   errorCode = AddRequest(device_handle_, LJ_ioGET_COUNTER, 0, 0, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-              errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("AddRequest function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "Add request to get counter0 ",
+                          kDefaultLevel);
   // Add request to get EIO0-8 votage
   for (int i = 0; i < kNumDOut; i++) {
     errorCode =
-        AddRequest(device_handle_, LJ_ioGET_DIGITAL_BIT_STATE, i+8, 0, 0, 0);
-    if (errorCode != LJE_NOERROR) {
-      LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-                errorCode);
-      CPPTOOLKIT_THROW_EXCEPTION(
-          std::runtime_error("AddRequest function returned an error: " +
-                             std::to_string(errorCode)),
-          cpptoolkit::ErrorLevel::E_ERROR);
-    }
+        AddRequest(device_handle_, LJ_ioGET_DIGITAL_BIT_STATE, i + 8, 0, 0, 0);
+    CHECK_LABJACK_API_ERROR(errorCode, "Add request to get EIO0-8 states ",
+                            kDefaultLevel);
   }
   // Get data from LabJack
   auto now = std::chrono::high_resolution_clock::now();
   errorCode = GoOne(device_handle_);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GoOne function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GoOne function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GoOne to Get data from LabJack ",
+                          kDefaultLevel);
   data.timepoint = now;
   // data.eio_states = eio_states_;
   double eio_state_temp;
@@ -355,35 +307,18 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   // Fill data into SignalData "data"
   for (int i = 0; i < kNumAIn; i++) {
     errorCode = GetResult(device_handle_, LJ_ioGET_AIN, i, &data.ain_votage[i]);
-    if (errorCode != LJE_NOERROR) {
-      LOG_ERROR("GetResult function returned an error: {}", kAddress_,
-                errorCode);
-      CPPTOOLKIT_THROW_EXCEPTION(
-          std::runtime_error("GetResult function returned an error: " +
-                             std::to_string(errorCode)),
-          cpptoolkit::ErrorLevel::E_ERROR);
-    }
+    CHECK_LABJACK_API_ERROR(errorCode, "GetResult to get AIN0-3 votage ",
+                            kDefaultLevel);
   }
   errorCode = GetResult(device_handle_, LJ_ioGET_COUNTER, 0, &data.count);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GetResult function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GetResult function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GetResult to get counter0 ",
+                          kDefaultLevel);
   for (int i = 0; i < kNumDOut; i++) {
     errorCode = GetResult(device_handle_, LJ_ioGET_DIGITAL_BIT_STATE, i + 8,
                           &eio_state_temp);
+    CHECK_LABJACK_API_ERROR(errorCode, "GetResult to get EIO0-8 states ",
+                            kDefaultLevel);
     data.eio_states[i] = static_cast<bool>(eio_state_temp);
-    if (errorCode != LJE_NOERROR) {
-      LOG_ERROR("GetResult function returned an error: {}", kAddress_,
-                errorCode);
-      CPPTOOLKIT_THROW_EXCEPTION(
-          std::runtime_error("GetResult function returned an error: " +
-                             std::to_string(errorCode)),
-          cpptoolkit::ErrorLevel::E_ERROR);
-    }
   }
   // LOG_TRACE("Counter:{}", data.count);
   return data;
@@ -431,48 +366,20 @@ void LabJackU3Controller::ResetCounter0() {
   LJ_ERROR errorCode = -1;
   // Add request to reset counter0
   errorCode = AddRequest(device_handle_, LJ_ioPUT_COUNTER_RESET, 0, 1, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-              errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("AddRequest function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "Add request to reset counter0 ",
+                          kDefaultLevel);
   // Add request to get counter0
   errorCode = AddRequest(device_handle_, LJ_ioGET_COUNTER, 0, 0, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("AddRequest function returned an error: {}", kAddress_,
-              errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("AddRequest function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "Add request to get counter0 for reset ",
+                          kDefaultLevel);
 
   errorCode = GoOne(device_handle_);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GoOne function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GoOne function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GoOne to reset counter0 ", kDefaultLevel);
   errorCode = GetResult(device_handle_, LJ_ioGET_COUNTER, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GetResult function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GetResult function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GetResult to get counter0 for reset ",
+                          kDefaultLevel);
   errorCode = GetResult(device_handle_, LJ_ioPUT_COUNTER_RESET, 0, 0);
-  if (errorCode != LJE_NOERROR) {
-    LOG_ERROR("GetResult function returned an error: {}", kAddress_, errorCode);
-    CPPTOOLKIT_THROW_EXCEPTION(
-        std::runtime_error("GetResult function returned an error: " +
-                           std::to_string(errorCode)),
-        cpptoolkit::ErrorLevel::E_ERROR);
-  }
+  CHECK_LABJACK_API_ERROR(errorCode, "GetResult to reset counter0 ",
+                          kDefaultLevel);
 }
 }  // namespace signal_flow_master

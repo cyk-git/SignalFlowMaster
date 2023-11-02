@@ -12,6 +12,7 @@
 
 #include <CppToolkit\async_consumer.h>
 #include <CppToolkit\locks.h>
+#include <CppToolkit\handle_exception.h>
 #include <LabJackUD.h>
 
 #include <array>
@@ -25,6 +26,9 @@
 #include <H5Cpp.h>
 
 #include "labjack_u3_ctrl_ui_interface.h"
+
+#define CHECK_LABJACK_API_ERROR(errorCode, operationName, level) \
+  CPPTOOLKIT_CHECK_API_ERRORCODE(errorCode, LJE_NOERROR, operationName, level)
 
 namespace signal_flow_master {
 struct DeviceInfo {
@@ -157,6 +161,8 @@ class LabJackU3Controller {
   LabJackU3CtrlUIInterface* ptr_ui_;
   const long kDeviceType_ = LJ_dtU3;
   const long kConnectionType_ = LJ_ctUSB;
+  const ::cpptoolkit::ErrorLevel kDefaultLevel =
+      ::cpptoolkit::ErrorLevel::E_ERROR;
   const std::string kAddress_;
   // Open Device
   bool flag_open_ = false;

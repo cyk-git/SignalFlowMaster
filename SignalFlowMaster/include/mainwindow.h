@@ -12,12 +12,12 @@ class MainWindowClass;
 };
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow {
+class BrowseDeviceUI : public QMainWindow {
   Q_OBJECT
 
  public:
-  MainWindow(QWidget *parent = nullptr);
-  ~MainWindow();
+  BrowseDeviceUI(QWidget *parent = nullptr);
+  ~BrowseDeviceUI();
 
   void FindDevice();
   void OpenDevice(const std::string &address);
@@ -32,5 +32,5 @@ class MainWindow : public QMainWindow {
   Ui::MainWindowClass *ui;
   std::vector<signal_flow_master::DeviceInfo> vec_device_info_;
   std::string current_device_address_;
-  std::vector<std::string> opened_addresses_;
+  static std::vector<std::string> opened_addresses_;
 };

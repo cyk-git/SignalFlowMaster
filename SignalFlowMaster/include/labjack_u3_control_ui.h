@@ -20,7 +20,7 @@ class LabJackU3ControlUI : public QMainWindow,
 
  public:
   using Protocol = signal_flow_master::LabJackU3Controller::Protocol;
-  LabJackU3ControlUI(const std::string &address, MainWindow *parent = nullptr);
+  LabJackU3ControlUI(const std::string &address, BrowseDeviceUI *parent = nullptr);
   ~LabJackU3ControlUI();
 
   void OpenDevice();
@@ -50,7 +50,7 @@ class LabJackU3ControlUI : public QMainWindow,
   void Run(int row);
 
  private:
-  MainWindow *ptr_mainwindow;
+  BrowseDeviceUI *ptr_mainwindow;
   Ui::LabJackU3ControlUIClass *ui;
   std::string kAddress_;
   signal_flow_master::LabJackU3Controller controller_;

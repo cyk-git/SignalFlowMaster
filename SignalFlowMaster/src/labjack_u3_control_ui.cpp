@@ -9,14 +9,14 @@
 #include "protocol_ui.h"
 
 LabJackU3ControlUI::LabJackU3ControlUI(const std::string& address,
-                                       MainWindow* parent)
+                                       BrowseDeviceUI* parent)
     : kAddress_(address),
-      QMainWindow(parent),
+      QMainWindow(parent, Qt::Window),
       ui(new Ui::LabJackU3ControlUIClass()),
       ptr_mainwindow(parent),
       controller_(address, this) {
   ui->setupUi(this);
-  cpptoolkit::AddQStatusBarSink(statusBar());
+  ::cpptoolkit::AddQStatusBarSink(statusBar());
   // Set default store path
   {
     std::string path = controller_.get_store_path();
@@ -31,6 +31,7 @@ LabJackU3ControlUI::LabJackU3ControlUI(const std::string& address,
 
 LabJackU3ControlUI::~LabJackU3ControlUI() {
   CloseDevice();
+  ::cpptoolkit::RemoveStatusBarSink(statusBar());
   delete ui;
 }
 
