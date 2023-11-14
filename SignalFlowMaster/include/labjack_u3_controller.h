@@ -11,19 +11,21 @@
 #define SIGNAL_FLOW_MASTER_LABJACK_U3_CONTROLLER_H_
 
 #include <CppToolkit\async_consumer.h>
-#include <CppToolkit\locks.h>
 #include <CppToolkit\handle_exception.h>
+#include <CppToolkit\locks.h>
+#include <H5Cpp.h>
 #include <LabJackUD.h>
 
 #include <array>
+#include <bitset>
 #include <chrono>
+#include <condition_variable>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <string>
 #include <thread>
 #include <vector>
-#include <H5Cpp.h>
 
 #include "labjack_u3_ctrl_ui_interface.h"
 
@@ -37,23 +39,54 @@ struct DeviceInfo {
 };
 
 class LabJackU3Controller {
- public:  // Define Structs
-  static const int kNumAIn = 4;
-  static const int kNumDOut = 8;
-  struct Operation {
-    int duration_in_ms;                    // duration time in ms
-    std::array<bool, kNumDOut> eioStates;  // 8 EIO Digital output states
+ public:                             // Define Structs
+  static const int kNumAIn = 4;      // AIO 0-3
+  static const int kNumDOut = 8;     // EIO 0-7
+  static const int kNumDIn = 4;      // CIO 0-3
+  static const int kNumCounter = 2;  // FIO 4-5
 
-    Operation() {
-      duration_in_ms = 0;
-      eioStates = {0, 0, 0, 0, 0, 0, 0, 0};
-    };
-    Operation(int duration_in_ms, std::array<bool, kNumDOut> eioStates)
-        : duration_in_ms(duration_in_ms), eioStates(eioStates) {}
+  // Using int_bool as an alternative to std::vector<bool> which is a
+  // specialized template that does not behave like a standard STL container.
+  // The std::vector<bool> is optimized for space and stores boolean values in a
+  // compact form, bit by bit, which leads to a non-standard behavior. This can
+  // cause unexpected issues with APIs expecting standard STL container
+  // semantics. For instance, references to elements are not actual references
+  // but proxy objects, and iterators do not necessarily return references upon
+  // dereferencing. The int_bool type is used here to ensure a consistent and
+  // expected behavior with vector elements being treated as regular integers,
+  // maintaining the size of a boolean while providing standard container
+  // characteristics.
+  using int_bool = int8_t;
+  static_assert(sizeof(int_bool) == sizeof(bool),
+                "int_bool must be the same size as bool");
+  struct StreamDataPack {
+    int pack_size;
+    std::vector<double> vec_ain_data = std::vector<double>(kNumAIn * pack_size);
+    std::vector<int_bool> vec_dout_data =
+        std::vector<int_bool>(kNumDOut * pack_size);
+    std::vector<int_bool> vec_din_data =
+        std::vector<int_bool>(kNumDIn * pack_size);
+    std::vector<uint32_t> vec_counter_data =
+        std::vector<uint32_t>(kNumCounter * pack_size);
+    explicit StreamDataPack(int _pack_size = 0) : pack_size(_pack_size) {}
+  };
+
+  struct Operation {
+    int duration_in_ms;               // duration time in ms
+    std::bitset<kNumDOut> eioStates;  // 8 EIO Digital output states
+
+    Operation(int duration_in_ms = 0, uint64_t _eioStates = 0b00000000)
+        : duration_in_ms(duration_in_ms), eioStates(_eioStates) {}
+    Operation(int duration_in_ms, std::array<bool, kNumDOut> _eioStates)
+        : duration_in_ms(duration_in_ms) {
+      for (int i = 0; i < kNumDOut; i++) {
+        eioStates.set(i, _eioStates.at(i));
+      }
+    }
   };
 
   struct Protocol {
-    int repetitions = 0;                    // repetition time
+    int repetitions = 0;                // repetition time
     std::vector<Operation> operations;  // operations sequence
     bool infinite_repetition = false;
     Protocol() = default;
@@ -81,35 +114,60 @@ class LabJackU3Controller {
     SignalDataStorer& operator=(const SignalDataStorer&) = delete;
     SignalDataStorer(SignalDataStorer&&) = delete;
     SignalDataStorer& operator=(SignalDataStorer&&) = delete;
+    
+    virtual void Init(double actual_scan_rate) {
+      actual_scan_rate_ = actual_scan_rate;
+      AsyncConsumer::Init();
+    }
 
-    void StoreSignalDataAsync(const SignalData& data);
+    void StoreSignalDataAsync(const StreamDataPack& data);
+
+    static H5::DataSet create2DDataSet(H5::H5File& file,
+                                       const std::string& name, int columns,
+                                       H5::DataType type);
+    static void extendDataSet(H5::DataSet& dataset, int rank, hsize_t newSize);
+    template <typename T>
+    static void writeDataToDataSet(H5::DataSet& dataset, int columns, int rows,
+                                   const H5::DataType& mem_type, const T* data);
+    static void writeMetadataToH5File(H5::H5File& file,
+                                      double actual_scan_rate);
 
    protected:
-    std::queue<std::unique_ptr<SignalData>> queue_data_buffer_;
-    std::unique_ptr<SignalData> loaded_data_ = nullptr;
+    std::queue<std::unique_ptr<StreamDataPack>> queue_data_buffer_;
+    std::unique_ptr<StreamDataPack> loaded_data_ = nullptr;
     const std::string kStorePath_;
 
-    //virtual void ConsumerLoop() { LOG_DEBUG("test"); }
-    virtual void Start();
-    virtual void Close();
-    virtual void LoadDataForProcess();
-    virtual void ProcessData();
-    virtual void ClearDataBuffer();
-    virtual bool is_need_wait_for_data() { return queue_data_buffer_.empty(); }
-    virtual bool is_data_buffer_empty() { return queue_data_buffer_.empty(); }
+    // virtual void ConsumerLoop() { LOG_DEBUG("test"); }
+    virtual void Start() override;
+    virtual void Close() override;
+    virtual void LoadDataForProcess() override;
+    virtual void ProcessData() override;
+    virtual void ClearDataBuffer() override;
+    virtual bool is_need_wait_for_data() override {
+      return queue_data_buffer_.empty();
+    }
+    virtual bool is_data_buffer_empty() override {
+      return queue_data_buffer_.empty();
+    }
 
    private:
+    double actual_scan_rate_ = -1;
     H5::H5File file_;
-    H5::DataSet dataset_time_;
-    H5::DataSet dataset_voltage_;
-    H5::DataSet dataset_states_;
-    H5::DataSet dataset_count_;
+    H5::DataSet dataset_ain_voltage_;
+    H5::DataSet dataset_dout_states_;
+    H5::DataSet dataset_din_states_;
+    H5::DataSet dataset_counter_;
+    // H5::DataSet dataset_time_;
+    // H5::DataSet dataset_voltage_;
+    // H5::DataSet dataset_states_;
+    // H5::DataSet dataset_count_;
     hsize_t dims_[1] = {0};
-   // void GetData(std::unique_ptr<int[]> data_ptr);
+    // void GetData(std::unique_ptr<int[]> data_ptr);
   };
 
  public:
-  explicit LabJackU3Controller(const std::string& address, LabJackU3CtrlUIInterface* ptr_ui)
+  explicit LabJackU3Controller(const std::string& address,
+                               LabJackU3CtrlUIInterface* ptr_ui)
       : kAddress_(address), ptr_ui_(ptr_ui) {}
   ~LabJackU3Controller() { CloseDevice(); }
   // Disallow copy and move
@@ -122,19 +180,20 @@ class LabJackU3Controller {
   void CloseDevice();
 
   void ExecuteProtocolList(const std::vector<Protocol>& vec_protocol);
-  //void ExecuteProtocolAsync(const Protocol& protocol);
+  // void ExecuteProtocolAsync(const Protocol& protocol);
   void ExecuteProtocolListAsync(const std::vector<Protocol>& vec_protocol);
   void InterruptProtocol() {
     if (flag_execute_protocol_ == true) {
       flag_execute_protocol_ = false;
     }
+    // sleep_waiter.notify_all();
+    sleep_waiter.wake_up();
     if (th_protocol_.joinable()) {
       th_protocol_.join();
     }
   }
 
   void CollectSignalDataAsync();
-  void ResetCounter0();
   void set_store_data(bool store) { flag_store_data_ = store; }
   void set_display_data(bool display) { flag_display_data_ = display; }
   void StopCollectData() {
@@ -155,6 +214,19 @@ class LabJackU3Controller {
     return store_dir_ + store_name_ + store_format_;
   }
 
+  void SetUpAIns();
+  void SetUpDINs();
+  void SetUpDOUTs();
+
+  void SetUpCounters();
+  void ResetCounter(int channel);
+  void ResetAllCounters();
+
+  void SetUpStreamMode();
+  void StartGetStreamData();
+  void StopGetStreamData();
+  StreamDataPack GetStreamDataPack();
+
   static std::vector<DeviceInfo> FindAllDevices();
 
  private:
@@ -167,10 +239,24 @@ class LabJackU3Controller {
   // Open Device
   bool flag_open_ = false;
   LJ_HANDLE device_handle_ = -1;
+  // Stream Settings
+  bool flag_stream_started_ = false;
+  double scan_rate_ = 5000;
+  double actual_scan_rate_ = -1;
+  int number_of_channels_ = 0;
+  double buffer_seconds_ = 5;
+  std::vector<int> vec_aio_channel_id = std::vector<int>(kNumAIn, -1);  // 0-3
+  int eio_channel_id = -1;                                              // 4
+  int cio_channel_id = -1;                                              // 5
+  std::vector<int> vec_counter_channel_id =
+      std::vector<int>(kNumCounter, -1);  // 6,8
+
   // Protocol
   bool flag_execute_protocol_ = false;
   std::thread th_protocol_;
-  //std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
+  // std::condition_variable sleep_waiter;
+  cpptoolkit::SleepWaiter sleep_waiter;
+  // std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
 
   void ExecuteOperation(const Operation& operation);
   void ExecuteProtocol(const Protocol& protocol);

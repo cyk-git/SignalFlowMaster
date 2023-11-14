@@ -51,7 +51,7 @@ void LabJackU3ControlUI::on_pushButton_collect_clicked() {
 }
 
 void LabJackU3ControlUI::on_pushButton_reset_clicked() {
-  controller_.ResetCounter0();
+  controller_.ResetAllCounters();
   ui->statusBar->showMessage(tr("Frame counter Reset to 0"));
 }
 

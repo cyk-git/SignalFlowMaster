@@ -2,14 +2,20 @@
 
 #include <CppToolkit\date_time.h>
 
+#include <algorithm>
+#include <bitset>
+#include <memory>
+
 namespace signal_flow_master {
 void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
-    const SignalData& data) {
+    const StreamDataPack& data) {
   PreGetData();
   try {
     if (!flag_handling_error_) {
       cpptoolkit::SafeLockUp lock(lock_data_transfer_, 0);
-      queue_data_buffer_.push(std::make_unique<SignalData>(data));  // Get Data
+      queue_data_buffer_.push(
+          std::make_unique<StreamDataPack>(data));  // Get Data
+      LOG_TRACE("notify_and_unlock");
       lock.notify_and_unlock();
     }
   } catch (...) {
@@ -21,38 +27,32 @@ void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
   PostGetData();
 }
 
+H5::DataSet LabJackU3Controller::SignalDataStorer::create2DDataSet(
+    H5::H5File& file, const std::string& name, int columns, H5::DataType type) {
+  hsize_t dims[2] = {1, columns};
+  hsize_t maxDims[2] = {H5S_UNLIMITED, columns};
+  H5::DataSpace dataspace(2, dims, maxDims);
+
+  H5::DSetCreatPropList prop_list;
+  hsize_t chunkDims[2] = {1, columns};
+  prop_list.setChunk(2, chunkDims);
+
+  return file.createDataSet(name, type, dataspace, prop_list);
+}
+
 void LabJackU3Controller::SignalDataStorer::Start() {
   // Create a new HDF5 file
   file_ = H5::H5File(kStorePath_, H5F_ACC_TRUNC);
-
-  hsize_t maxDims[1] = {H5S_UNLIMITED};
-  H5::DataSpace dataspace(1, dims_, maxDims);
-
-  H5::DSetCreatPropList property_1dim;
-  hsize_t chunkDims[1] = {1};
-  property_1dim.setChunk(1, chunkDims);
-
-  dataset_time_ = file_.createDataSet("timepoint", H5::PredType::NATIVE_INT64,
-                                      dataspace, property_1dim);
-  dataset_count_ = file_.createDataSet("count", H5::PredType::NATIVE_DOUBLE,
-                                       dataspace, property_1dim);
-
-  // For ain_votage and eio_states, we specify the array dimensions explicitly
-  hsize_t voltageDims[2] = {1, kNumAIn};
-  hsize_t voltageMaxDims[2] = {H5S_UNLIMITED, kNumAIn};
-  H5::DataSpace voltageSpace(2, voltageDims, voltageMaxDims);
-  H5::DSetCreatPropList property_ain;
-  property_ain.setChunk(2, voltageDims);
-  dataset_voltage_ = file_.createDataSet(
-      "ain_voltage", H5::PredType::NATIVE_DOUBLE, voltageSpace, property_ain);
-
-  hsize_t stateDims[2] = {1, kNumDOut};
-  hsize_t stateMaxDims[2] = {H5S_UNLIMITED, kNumDOut};
-  H5::DataSpace stateSpace(2, stateDims, stateMaxDims);
-  H5::DSetCreatPropList property_dout;
-  property_dout.setChunk(2, stateDims);
-  dataset_states_ = file_.createDataSet(
-      "eio_states", H5::PredType::NATIVE_HBOOL, stateSpace, property_dout);
+  writeMetadataToH5File(file_, actual_scan_rate_);
+  // Create datasets for StreamDataPack vectors
+  dataset_ain_voltage_ = create2DDataSet(file_, "ain_voltage", kNumAIn,
+                                         H5::PredType::NATIVE_DOUBLE);
+  dataset_dout_states_ = create2DDataSet(file_, "dout_states", kNumDOut,
+                                         H5::PredType::NATIVE_HBOOL);
+  dataset_din_states_ =
+      create2DDataSet(file_, "din_states", kNumDIn, H5::PredType::NATIVE_HBOOL);
+  dataset_counter_ = create2DDataSet(file_, "counter", kNumCounter,
+                                     H5::PredType::NATIVE_UINT32);
 
   cpptoolkit::AsyncConsumer::Start();
 }
@@ -66,55 +66,92 @@ void LabJackU3Controller::SignalDataStorer::LoadDataForProcess() {
   loaded_data_ = std::move(queue_data_buffer_.front());
   queue_data_buffer_.pop();
 }
+void LabJackU3Controller::SignalDataStorer::extendDataSet(H5::DataSet& dataset,
+                                                          int rank,
+                                                          hsize_t newSize) {
+  std::vector<hsize_t> currentDims(rank);
+  dataset.getSpace().getSimpleExtentDims(
+      currentDims.data());   // Get current dim size
+  currentDims[0] = newSize;  // Change first dim size
+
+  dataset.extend(currentDims.data());  // Extend dataset
+}
+
+void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
+    H5::H5File& file, double actual_scan_rate) {
+  // Get the current time including milliseconds
+  auto now = std::chrono::system_clock::now();
+  auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&now_as_time_t), "%Y-%m-%d %H:%M:%S");
+
+  // add milliseconds to string
+  // auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+  //                  now.time_since_epoch()) %
+  //              1000;
+  //ss << '.' << std::setfill('0') << std::setw(3) << now_ms.count();
+
+  std::string timeStr = ss.str();
+
+  // Create a dataspace for the attribute (scalar, since it's a single value)
+  H5::DataSpace attr_dataspace = H5::DataSpace(H5S_SCALAR);
+
+  // Write the actual scan rate
+  H5::Attribute scan_rate_attr = file.createAttribute(
+      "actual_scan_rate", H5::PredType::NATIVE_DOUBLE, attr_dataspace);
+  scan_rate_attr.write(H5::PredType::NATIVE_DOUBLE, &actual_scan_rate);
+
+  // Write the current time
+  H5::StrType str_type(H5::PredType::C_S1,
+                       H5T_VARIABLE);  // Variable length string type
+  H5::Attribute time_attr =
+      file.createAttribute("current_time", str_type, attr_dataspace);
+  time_attr.write(str_type, timeStr);
+}
+
+template <typename T>
+void LabJackU3Controller::SignalDataStorer::writeDataToDataSet(
+    H5::DataSet& dataset, int columns, int rows, const H5::DataType& mem_type,
+    const T* data) {
+  // Get the new dimensions of the dataset
+  hsize_t dims[2];
+  dataset.getSpace().getSimpleExtentDims(dims, nullptr);
+  hsize_t offset[2] = {dims[0] - rows, 0};
+  hsize_t count[2] = {rows, columns};
+
+  // Create file and memory dataspace
+  H5::DataSpace fspace = dataset.getSpace();
+  fspace.selectHyperslab(H5S_SELECT_SET, count, offset);
+  H5::DataSpace mspace(2, count);
+
+  // Write the data to the dataset
+  dataset.write(data, mem_type, mspace, fspace);
+}
 
 void LabJackU3Controller::SignalDataStorer::ProcessData() {
   // LOG_DEBUG("[Consumer Process]First elem: {}", loaded_data_->ain_votage[0]);
   const auto& data = *loaded_data_;
-  // Increase dataset size
-  dims_[0]++;
-  dataset_time_.extend(dims_);
-  dataset_count_.extend(dims_);
-
-  hsize_t extendedDims[2] = {dims_[0], kNumAIn};
-  dataset_voltage_.extend(extendedDims);
-
-  hsize_t extendedStateDims[2] = {dims_[0], kNumDOut};
-  dataset_states_.extend(extendedStateDims);
-
-  // Write new data
-  H5::DataSpace spaceTime = dataset_time_.getSpace();
-  hsize_t start[1] = {dims_[0] - 1};
-  hsize_t count[1] = {1};
-  spaceTime.selectHyperslab(H5S_SELECT_SET, count, start);
-  H5::DataSpace memspaceTime(1, count);
-  dataset_time_.write(&data.timepoint, H5::PredType::NATIVE_INT64, memspaceTime,
-                      spaceTime);
-
-  H5::DataSpace spaceCount = dataset_count_.getSpace();
-  spaceCount.selectHyperslab(H5S_SELECT_SET, count, start);
-  H5::DataSpace memspaceCount(1, count);
-  dataset_count_.write(&data.count, H5::PredType::NATIVE_DOUBLE, memspaceCount,
-                       spaceCount);
-
-  hsize_t startVoltage[2] = {dims_[0] - 1, 0};
-  hsize_t countVoltage[2] = {1, kNumAIn};
-  H5::DataSpace spaceVoltage = dataset_voltage_.getSpace();
-  spaceVoltage.selectHyperslab(H5S_SELECT_SET, countVoltage, startVoltage);
-  H5::DataSpace memspaceVoltage(2, countVoltage);
-  dataset_voltage_.write(data.ain_votage.data(), H5::PredType::NATIVE_DOUBLE,
-                         memspaceVoltage, spaceVoltage);
-
-  hsize_t startState[2] = {dims_[0] - 1, 0};
-  hsize_t countState[2] = {1, kNumDOut};
-  H5::DataSpace spaceState = dataset_states_.getSpace();
-  spaceState.selectHyperslab(H5S_SELECT_SET, countState, startState);
-  H5::DataSpace memspaceState(2, countState);
-  dataset_states_.write(data.eio_states.data(), H5::PredType::NATIVE_HBOOL,
-                        memspaceState, spaceState);
+  // Increase dataset size for each data type
+  dims_[0] += data.pack_size;
+  extendDataSet(dataset_ain_voltage_, kNumAIn, dims_[0]);
+  extendDataSet(dataset_dout_states_, kNumDOut, dims_[0]);
+  extendDataSet(dataset_din_states_, kNumDIn, dims_[0]);
+  extendDataSet(dataset_counter_, kNumCounter, dims_[0]);
+  LOG_DEBUG("data.pack_size:{}", data.pack_size);
+  LOG_DEBUG("dims_[0]:{}", dims_[0]);
+  // Write new data for each data type
+  writeDataToDataSet(dataset_ain_voltage_, kNumAIn, data.pack_size,
+                     H5::PredType::NATIVE_DOUBLE, data.vec_ain_data.data());
+  writeDataToDataSet(dataset_dout_states_, kNumDOut, data.pack_size,
+                     H5::PredType::NATIVE_HBOOL, data.vec_dout_data.data());
+  writeDataToDataSet(dataset_din_states_, kNumDIn, data.pack_size,
+                     H5::PredType::NATIVE_HBOOL, data.vec_din_data.data());
+  writeDataToDataSet(dataset_counter_, kNumCounter, data.pack_size,
+                     H5::PredType::NATIVE_UINT32, data.vec_counter_data.data());
 }
 
 void LabJackU3Controller::SignalDataStorer::ClearDataBuffer() {
-  queue_data_buffer_ = std::queue<std::unique_ptr<SignalData>>();
+  queue_data_buffer_ = std::queue<std::unique_ptr<StreamDataPack>>();
 }
 
 std::vector<DeviceInfo> LabJackU3Controller::FindAllDevices() {
@@ -176,30 +213,27 @@ void LabJackU3Controller::OpenDevice() {
 
   // Execute the pin_configuration_reset IOType so that all
   // pin assignments are in the factory default condition.
-  // The ePut function is used, which combines the add/go/get.
   errorCode = ePut(device_handle_, LJ_ioPIN_CONFIGURATION_RESET, 0, 0, 0);
   CHECK_LABJACK_API_ERROR(errorCode, "LJ_ioPIN_CONFIGURATION_RESET ",
                           kDefaultLevel);
-  // Set the pin offset to 4.
-  AddRequest(device_handle_, LJ_ioPUT_CONFIG, LJ_chTIMER_COUNTER_PIN_OFFSET, 4,
-             0, 0);
-  CHECK_LABJACK_API_ERROR(errorCode,
-                          "LJ_ioPUT_CONFIG->LJ_chTIMER_COUNTER_PIN_OFFSET ",
-                          kDefaultLevel);
-  // Enable Counter1. It will use FIO4.
-  errorCode = AddRequest(device_handle_, LJ_ioPUT_COUNTER_ENABLE, 0, 1, 0, 0);
-  CHECK_LABJACK_API_ERROR(errorCode, "LJ_ioPUT_COUNTER_ENABLE ", kDefaultLevel);
-
-  errorCode = GoOne(device_handle_);
-  CHECK_LABJACK_API_ERROR(errorCode, "GoOne for LabJack Init ", kDefaultLevel);
-  ResetCounter0();
+  SetUpAIns();
+  SetUpDINs();
+  SetUpDOUTs();
+  SetUpCounters();
+  SetUpStreamMode();
 
   flag_open_ = true;
 
   set_store_data(true);  // TODO
-  // CollectSignalDataAsync();
+  // flag_execute_protocol_ = true;
+  // ExecuteOperation(Operation(0, {0, 1, 0, 1, 1, 0, 1, 0}));
+  // flag_execute_protocol_ = false;
+  // StartGetStreamData();
+  // GetStreamDataPack();
+  // StopGetStreamData();
+  //  CollectSignalDataAsync();
   //
-  // StopCollectData();
+  //  StopCollectData();
 }
 
 void LabJackU3Controller::CloseDevice() {
@@ -209,26 +243,54 @@ void LabJackU3Controller::CloseDevice() {
   flag_open_ = false;
   InterruptProtocol();
   StopCollectData();
+  StopGetStreamData();
   device_handle_ = -1;
   LOG_INFO("Close LabJack-U3 {}", kAddress_);
 }
 
 void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
   LJ_ERROR errorCode;
-  for (int i = 0; i < 8; i++) {
-    if (!flag_execute_protocol_) {
-      return;
-    }
-    errorCode = eDO(device_handle_, i + 8, operation.eioStates[i]);
-    // errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_BIT,i + 8,
-    // operation.eioStates[i],0,0);
-    CHECK_LABJACK_API_ERROR(errorCode, "eDo for ExecuteOperation ",
-                            kDefaultLevel);
-    LOG_TRACE("Set EIO{} to {}", i, operation.eioStates[i]);
-    // eio_states_[i] = operation.eioStates[i];
+
+  //// Method one: executive eDO in turn
+  // for (int i = 0; i < kNumDOut; i++) {
+  //   if (!flag_execute_protocol_) {
+  //     return;
+  //   }
+  //   errorCode = eDO(device_handle_, i + 8, operation.eioStates[i]);
+  //   // errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_BIT,i + 8,
+  //   // operation.eioStates[i],0,0);
+  //   CHECK_LABJACK_API_ERROR(errorCode, "eDo for ExecuteOperation ",
+  //                           kDefaultLevel);
+  //   LOG_TRACE("Set EIO{} to {}", i, operation.eioStates[i]);
+  //   // eio_states_[i] = operation.eioStates[i];
+  // }
+
+  //// Method 2: use PORT method to write all ports
+  if (!flag_execute_protocol_) {
+    return;
   }
-  std::this_thread::sleep_for(
-      std::chrono::milliseconds(operation.duration_in_ms));
+  errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8,
+                         operation.eioStates.to_ulong(), kNumDOut, 0);
+  CHECK_LABJACK_API_ERROR(
+      errorCode,
+      "Add request to write EIO0-8 states " + operation.eioStates.to_string(),
+      kDefaultLevel);
+  errorCode = GoOne(device_handle_);
+  CHECK_LABJACK_API_ERROR(errorCode, "GoOne to write EIO0-8 states ",
+                          kDefaultLevel);
+  errorCode = GetResult(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8, 0);
+  CHECK_LABJACK_API_ERROR(errorCode, "GetResult to write EIO0-8 states ",
+                          kDefaultLevel);
+  LOG_TRACE("Set EIO0-7 to {}", operation.eioStates.to_string());
+
+  // std::this_thread::sleep_for(
+  //     std::chrono::milliseconds(operation.duration_in_ms));
+  // std::mutex temp_mutex;
+  // std::unique_lock<std::mutex> temp_lk(temp_mutex);
+  // sleep_waiter.wait_for(temp_lk,
+  //                       std::chrono::milliseconds(operation.duration_in_ms),
+  //                       [this] { return !flag_execute_protocol_; });
+  sleep_waiter.sleep_for(operation.duration_in_ms);
 }
 
 void LabJackU3Controller::ExecuteProtocol(const Protocol& protocol) {
@@ -325,28 +387,267 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
 }
 
 void LabJackU3Controller::CollectSignalData() {
-  SignalData current_data;
+  // SignalData current_data;
+  StreamDataPack current_data_pack;
   SignalDataStorer storer(store_dir_ + cpptoolkit::DateTime().date_time() +
                           "_" + store_name_ + store_format_);
-  storer.Init();
   // LOG_INFO(full_path.string());
   flag_collect_data_ = true;
+  // Stream Mode
+  StartGetStreamData();
+  storer.Init(actual_scan_rate_);
   try {
     while (flag_collect_data_) {
-      current_data = CollectOneSignalData();
-      LOG_TRACE("AIN0 {}", current_data.ain_votage[0]);
+      // No Stream Mode
+      // current_data = CollectOneSignalData();
+      // LOG_TRACE("AIN0 {}", current_data.ain_votage[0]);
+      // if (flag_display_data_) {
+      //  // DisplayAsync
+      //}
+      // if (flag_store_data_) {
+      //  storer.StoreSignalDataAsync(current_data);
+      //}
+
+      // Stream Mode
+      current_data_pack = GetStreamDataPack();
       if (flag_display_data_) {
         // DisplayAsync
       }
       if (flag_store_data_) {
-        storer.StoreSignalDataAsync(current_data);
+        storer.StoreSignalDataAsync(current_data_pack);
       }
     }
   } catch (...) {
     LOG_ERROR("Unknown exception caught. Signal Collection End.");
   }
-
+  StopGetStreamData();
   ptr_ui_->CollectSignalDataEnded();
+}
+
+void LabJackU3Controller::SetUpAIns() {
+  double dblVoltage;
+  for (int i = 0; i < kNumAIn; i++) {
+    auto errorCode = eAIN(device_handle_, i, 31, &dblVoltage, 0, 0, 0, 0, 0, 0);
+    // If the negative channel is set to 31/199, the U3 does a single-ended
+    // conversion and returns a unipolar value.
+    CHECK_LABJACK_API_ERROR(errorCode,
+                            "eAIN to set up AIN-" + std::to_string(i) + " ",
+                            kDefaultLevel);
+  }
+}
+
+void LabJackU3Controller::SetUpDINs() {
+  long lngState;
+  for (int i = 0; i < kNumDIn; i++) {
+    auto errorCode = eDI(device_handle_, i + 16, &lngState);
+    CHECK_LABJACK_API_ERROR(errorCode,
+                            "eDI to set up DIN-" + std::to_string(i) + " ",
+                            kDefaultLevel);
+  }
+}
+
+void LabJackU3Controller::SetUpDOUTs() {
+  long lngState = false;
+  for (int i = 0; i < kNumDIn; i++) {
+    auto errorCode = eDO(device_handle_, i + 8, lngState);
+    CHECK_LABJACK_API_ERROR(errorCode,
+                            "eDO to set up DOUT-" + std::to_string(i) + " ",
+                            kDefaultLevel);
+  }
+}
+
+void LabJackU3Controller::SetUpStreamMode() {
+  // Set the scan rate.
+  auto errorCode = AddRequest(device_handle_, LJ_ioPUT_CONFIG,
+                              LJ_chSTREAM_SCAN_FREQUENCY, scan_rate_, 0, 0);
+  CHECK_LABJACK_API_ERROR(
+      errorCode, "AddRequest for LJ_chSTREAM_SCAN_FREQUENCY ", kDefaultLevel);
+
+  // Configure reads to wait and retrieve the desired amount of data.
+  errorCode = AddRequest(device_handle_, LJ_ioPUT_CONFIG, LJ_chSTREAM_WAIT_MODE,
+                         LJ_swSLEEP, 0, 0);
+  CHECK_LABJACK_API_ERROR(errorCode, "AddRequest for LJ_chSTREAM_WAIT_MODE ",
+                          kDefaultLevel);
+
+  // Define AIN stream
+  errorCode =
+      AddRequest(device_handle_, LJ_ioCLEAR_STREAM_CHANNELS, 0, 0, 0, 0);
+  CHECK_LABJACK_API_ERROR(
+      errorCode, "AddRequest for LJ_ioCLEAR_STREAM_CHANNELS ", kDefaultLevel);
+  for (int i = 0; i < kNumAIn; i++) {
+    errorCode = AddRequest(device_handle_, LJ_ioADD_STREAM_CHANNEL, i, 0, 0, 0);
+    CHECK_LABJACK_API_ERROR(
+        errorCode,
+        "AddRequest for LJ_ioADD_STREAM_CHANNEL-" + std::to_string(i) + " ",
+        kDefaultLevel);
+    vec_aio_channel_id.at(i) = number_of_channels_;
+    number_of_channels_++;
+  }
+
+  // Define DOUT stream
+  errorCode = AddRequest(device_handle_, LJ_ioADD_STREAM_CHANNEL, 193, 0, 0, 0);
+  CHECK_LABJACK_API_ERROR(errorCode,
+                          "AddRequest for LJ_ioADD_STREAM_CHANNEL-EIO_FIO ",
+                          kDefaultLevel);
+  eio_channel_id = number_of_channels_;
+  number_of_channels_++;
+
+  // Define DIN stream
+  errorCode = AddRequest(device_handle_, LJ_ioADD_STREAM_CHANNEL, 194, 0, 0, 0);
+  CHECK_LABJACK_API_ERROR(errorCode,
+                          "AddRequest for LJ_ioADD_STREAM_CHANNEL-MIO_CIO ",
+                          kDefaultLevel);
+  cio_channel_id = number_of_channels_;
+  number_of_channels_++;
+
+  // Define Counter stream
+  for (int i = 0; i < kNumCounter; i++) {
+    errorCode =
+        AddRequest(device_handle_, LJ_ioADD_STREAM_CHANNEL, 210 + i, 0, 0, 0);
+    CHECK_LABJACK_API_ERROR(errorCode,
+                            "AddRequest for LJ_ioADD_STREAM_CHANNEL-Counter-" +
+                                std::to_string(i) + "(LSW) ",
+                            kDefaultLevel);
+    vec_counter_channel_id.at(i) = number_of_channels_;
+    number_of_channels_++;
+
+    errorCode =
+        AddRequest(device_handle_, LJ_ioADD_STREAM_CHANNEL, 224, 0, 0, 0);
+    CHECK_LABJACK_API_ERROR(
+        errorCode,
+        "AddRequest for LJ_ioADD_STREAM_CHANNEL-TC_Capture(Counter-" +
+            std::to_string(i) + "(MSW)) ",
+        kDefaultLevel);
+    number_of_channels_++;
+  }
+
+  // Give the UD driver a buffer_seconds_ second buffer
+  errorCode =
+      AddRequest(device_handle_, LJ_ioPUT_CONFIG, LJ_chSTREAM_BUFFER_SIZE,
+                 scan_rate_ * number_of_channels_ * buffer_seconds_, 0, 0);
+  CHECK_LABJACK_API_ERROR(errorCode, "AddRequest for LJ_chSTREAM_BUFFER_SIZE ",
+                          kDefaultLevel);
+
+  // Execute the requests.
+  errorCode = GoOne(device_handle_);
+  CHECK_LABJACK_API_ERROR(errorCode, "GoOne for Stream Init ", kDefaultLevel);
+}
+
+void LabJackU3Controller::StartGetStreamData() {
+  if (!flag_stream_started_) {
+    auto errorCode =
+        eGet(device_handle_, LJ_ioSTART_STREAM, 0, &actual_scan_rate_, 0);
+    CHECK_LABJACK_API_ERROR(errorCode, "eGet for LJ_ioSTART_STREAM ",
+                            kDefaultLevel);
+    flag_stream_started_ = true;
+    LOG_INFO("LabJack data stream started. Actual scan rate: {}Hz",
+             actual_scan_rate_);
+  }
+}
+
+void LabJackU3Controller::StopGetStreamData() {
+  if (flag_stream_started_) {
+    auto errorCode = ePut(device_handle_, LJ_ioSTOP_STREAM, 0, 0, 0);
+    CHECK_LABJACK_API_ERROR(errorCode, "eGet for LJ_ioSTOP_STREAM ",
+                            kDefaultLevel);
+    flag_stream_started_ = false;
+    LOG_INFO("LabJack data stream stopped.");
+  }
+}
+
+LabJackU3Controller::StreamDataPack LabJackU3Controller::GetStreamDataPack() {
+  if (!flag_stream_started_) {
+    LOG_WARN("Stream haven't been started!");
+    return StreamDataPack();
+  }
+  // Read data until done.
+  // Must set the number of scans to read each iteration, as the read
+  // returns the actual number read.
+  double actual_number_read = 5000;
+  double dblCommBacklog = -1;
+  double dblUDBacklog = -1;
+  std::vector<double> raw_data(actual_number_read * number_of_channels_, -1);
+
+  // Read the data. Note that the array passed must be sized to hold
+  // enough SAMPLES, and the Value passed specifies the number of SCANS
+  // to read.
+  auto errorCode =
+      eGetPtr(device_handle_, LJ_ioGET_STREAM_DATA, LJ_chALL_CHANNELS,
+              &actual_number_read, raw_data.data());
+  CHECK_LABJACK_API_ERROR(errorCode, "eGetPtr for LJ_ioGET_STREAM_DATA ",
+                          kDefaultLevel);
+
+  // Unpack data
+  // std::vector<double> vec_ain_data(kNumAIn * actual_number_read);
+  // std::vector<bool> vec_dout_data(kNumDOut * actual_number_read);
+  // std::vector<bool> vec_din_data(kNumDIn * actual_number_read);
+  // std::vector<uint32_t> vec_counter_data(kNumCounter * actual_number_read);
+  // std::vector<uint16_t> uint16_dout_data(actual_number_read, -1);
+  // std::vector<uint16_t> uint16_din_data(actual_number_read, -1);
+  StreamDataPack data_pack(actual_number_read);
+  for (int i = 0; i < actual_number_read; i++) {
+    int index_base_in_raw = i * number_of_channels_;
+    // Get AIn
+    for (int j = 0; j < kNumAIn; j++) {
+      data_pack.vec_ain_data.at(j + i * kNumAIn) =
+          raw_data.at(vec_aio_channel_id.at(j) + index_base_in_raw);
+    }
+    // std::copy(data.begin() + index_base_in_raw, data.begin() +
+    // index_base_in_raw + kNumAIn,
+    //           data_pack.vec_ain_data.begin());
+    // Get DOut
+    uint16_t uint16_dout_data =
+        static_cast<uint16_t>(raw_data.at(eio_channel_id + index_base_in_raw));
+    for (int j = 0; j < kNumDOut; j++) {
+      data_pack.vec_dout_data.at(j + i * kNumDOut) =
+          (uint16_dout_data >> (8 + j)) & 0x1;
+    }
+    // Get DIn
+    uint16_t uint16_din_data =
+        static_cast<uint16_t>(raw_data.at(cio_channel_id + index_base_in_raw));
+    for (int j = 0; j < kNumDIn; j++) {
+      data_pack.vec_din_data.at(j + i * kNumDIn) = (uint16_din_data >> j) & 0x1;
+    }
+    // Get Counters
+    for (int j = 0; j < kNumCounter; j++) {
+      uint16_t counter_lsw = static_cast<uint16_t>(
+          raw_data.at(vec_counter_channel_id.at(j) + index_base_in_raw));
+      uint16_t counter_msw = static_cast<uint16_t>(
+          raw_data.at(vec_counter_channel_id.at(j) + 1 + index_base_in_raw));
+      data_pack.vec_counter_data.at(j + i * kNumCounter) =
+          (static_cast<uint32_t>(counter_msw) << 16) | counter_lsw;
+    }
+  }
+
+  // Retrieve the current U3 backlog. The UD driver retrieves
+  // stream data from the U3 in the background, but if the computer
+  // is too slow for some reason the driver might not be able to read
+  // the data as fast as the U3 is acquiring it, and thus there will
+  // be data left over in the U3 buffer.
+  errorCode = eGet(device_handle_, LJ_ioGET_CONFIG, LJ_chSTREAM_BACKLOG_COMM,
+                   &dblCommBacklog, 0);
+  CHECK_LABJACK_API_ERROR(errorCode, "eGet for LJ_chSTREAM_BACKLOG_COMM ",
+                          kDefaultLevel);
+  // Retrieve the current UD driver backlog. If this is growing, then
+  // the application software is not pulling data from the UD driver
+  // fast enough.
+  errorCode = eGet(device_handle_, LJ_ioGET_CONFIG, LJ_chSTREAM_BACKLOG_UD,
+                   &dblUDBacklog, 0);
+  CHECK_LABJACK_API_ERROR(errorCode, "eGet for LJ_chSTREAM_BACKLOG_UD ",
+                          kDefaultLevel);
+
+  std::function<std::string(const int_bool&)> int_bool_to_bool_string =
+      [](const int_bool& c) -> std::string {
+    return std::to_string(static_cast<bool>(c));
+  };
+  LOG_TRACE(cpptoolkit::PreviewVector(data_pack.vec_ain_data, kNumAIn));
+  LOG_TRACE(cpptoolkit::PreviewVector(data_pack.vec_dout_data, kNumDOut,
+                                      int_bool_to_bool_string));
+  LOG_TRACE(cpptoolkit::PreviewVector(data_pack.vec_din_data, kNumDIn,
+                                      int_bool_to_bool_string));
+  LOG_TRACE(cpptoolkit::PreviewVector(data_pack.vec_counter_data, kNumCounter));
+
+  return data_pack;
 }
 
 void LabJackU3Controller::CollectSignalDataAsync() {
@@ -357,7 +658,26 @@ void LabJackU3Controller::CollectSignalDataAsync() {
   th_data_ = std::thread(&LabJackU3Controller::CollectSignalData, this);
 }
 
-void LabJackU3Controller::ResetCounter0() {
+void LabJackU3Controller::SetUpCounters() {  // Set Up Counters
+  // Set the pin offset to 4.
+  auto errorCode = AddRequest(device_handle_, LJ_ioPUT_CONFIG,
+                              LJ_chTIMER_COUNTER_PIN_OFFSET, 4, 0, 0);
+  CHECK_LABJACK_API_ERROR(errorCode,
+                          "LJ_ioPUT_CONFIG->LJ_chTIMER_COUNTER_PIN_OFFSET ",
+                          kDefaultLevel);
+  for (int i = 0; i < kNumCounter; i++) {
+    // Enable Counter_i. It will use FIO4+i.
+    errorCode = AddRequest(device_handle_, LJ_ioPUT_COUNTER_ENABLE, i, 1, 0, 0);
+    CHECK_LABJACK_API_ERROR(errorCode, "LJ_ioPUT_COUNTER_ENABLE ",
+                            kDefaultLevel);
+    errorCode = GoOne(device_handle_);
+    CHECK_LABJACK_API_ERROR(errorCode, "GoOne for LabJack Init ",
+                            kDefaultLevel);
+    ResetCounter(i);
+  }
+}
+
+void LabJackU3Controller::ResetCounter(int channel) {
   // Read & reset Counter0. Note that with the U3 reset is just
   // setting a driver flag to reset on the next read, so reset
   // is generally combined with a read in an add/go/get block.
@@ -365,21 +685,27 @@ void LabJackU3Controller::ResetCounter0() {
   // matter ... the read will always happen right before the reset.
   LJ_ERROR errorCode = -1;
   // Add request to reset counter0
-  errorCode = AddRequest(device_handle_, LJ_ioPUT_COUNTER_RESET, 0, 1, 0, 0);
+  errorCode =
+      AddRequest(device_handle_, LJ_ioPUT_COUNTER_RESET, channel, 1, 0, 0);
   CHECK_LABJACK_API_ERROR(errorCode, "Add request to reset counter0 ",
                           kDefaultLevel);
   // Add request to get counter0
-  errorCode = AddRequest(device_handle_, LJ_ioGET_COUNTER, 0, 0, 0, 0);
+  errorCode = AddRequest(device_handle_, LJ_ioGET_COUNTER, channel, 0, 0, 0);
   CHECK_LABJACK_API_ERROR(errorCode, "Add request to get counter0 for reset ",
                           kDefaultLevel);
 
   errorCode = GoOne(device_handle_);
   CHECK_LABJACK_API_ERROR(errorCode, "GoOne to reset counter0 ", kDefaultLevel);
-  errorCode = GetResult(device_handle_, LJ_ioGET_COUNTER, 0, 0);
+  errorCode = GetResult(device_handle_, LJ_ioGET_COUNTER, channel, 0);
   CHECK_LABJACK_API_ERROR(errorCode, "GetResult to get counter0 for reset ",
                           kDefaultLevel);
-  errorCode = GetResult(device_handle_, LJ_ioPUT_COUNTER_RESET, 0, 0);
+  errorCode = GetResult(device_handle_, LJ_ioPUT_COUNTER_RESET, channel, 0);
   CHECK_LABJACK_API_ERROR(errorCode, "GetResult to reset counter0 ",
                           kDefaultLevel);
+}
+void LabJackU3Controller::ResetAllCounters() {
+  for (int i = 0; i < kNumCounter; i++) {
+    ResetCounter(i);
+  }
 }
 }  // namespace signal_flow_master
