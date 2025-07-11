@@ -31,24 +31,24 @@ void BrowseDeviceUI::FindDevice() {
   QStandardItem* header1 = new QStandardItem("Device");
   model->setHorizontalHeaderItem(0, header1);
 
-  // Ìî³ämodel
+  // å¡«å……model
   for (size_t i = 0; i < vec_device_info_.size(); ++i) {
     const signal_flow_master::DeviceInfo& deviceInfo = vec_device_info_[i];
 
-    // ´´½¨ÀàĞÍ×÷ÎªµÚÒ»¼¶
+    // åˆ›å»ºç±»å‹ä½œä¸ºç¬¬ä¸€çº§
     QStandardItem* typeItem =
         new QStandardItem(QString::fromStdString(deviceInfo.type));
     rootItem->appendRow(typeItem);
     typeItem->setEditable(false);
 
-    // ´´½¨ÏÂ±ê×÷ÎªµÚ¶ş¼¶
+    // åˆ›å»ºä¸‹æ ‡ä½œä¸ºç¬¬äºŒçº§
     QStandardItem* indexItem = new QStandardItem(
         QString::fromStdString(deviceInfo.infos.at("Serial Number")));
     typeItem->appendRow(indexItem);
     indexItem->setData(i);
     indexItem->setEditable(false);
 
-    //// Èç¹û»¹ĞèÒªÌí¼ÓinfosÀïÃæµÄĞÅÏ¢×÷ÎªµÚÈı¼¶
+    //// å¦‚æœè¿˜éœ€è¦æ·»åŠ infosé‡Œé¢çš„ä¿¡æ¯ä½œä¸ºç¬¬ä¸‰çº§
     // for (const auto& [key, value] : deviceInfo.infos) {
     //   QStandardItem* keyItem = new
     //   QStandardItem(QString::fromStdString(key)); QStandardItem* valueItem =

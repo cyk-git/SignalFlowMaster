@@ -20,45 +20,45 @@
 //  LJ_ERROR errorCode;
 //  LJ_HANDLE handle;
 //
-//  // ´ò¿ªµÚÒ»¸ö¿ÉÓÃµÄU3Éè±¸
+//  // æ‰“å¼€ç¬¬ä¸€ä¸ªå¯ç”¨çš„U3è®¾å¤‡
 //  errorCode = OpenLabJack(LJ_dtU3, LJ_ctUSB, "1", 1, &handle);
 //  if (errorCode != LJE_NOERROR) {
-//    std::cout << "ÎŞ·¨´ò¿ªLabJack U3: " << errorCode << std::endl;
+//    std::cout << "æ— æ³•æ‰“å¼€LabJack U3: " << errorCode << std::endl;
 //    return 1;
 //  }
 //
-//  for (int i = 0; i < 20; i++) {  // ³ÖĞø¶ÁÈ¡
+//  for (int i = 0; i < 20; i++) {  // æŒç»­è¯»å–
 //    double voltage = 0;
 //
-//    // ¶ÁÈ¡Ä£ÄâÊäÈëAI0µÄµçÑ¹
+//    // è¯»å–æ¨¡æ‹Ÿè¾“å…¥AI0çš„ç”µå‹
 //    errorCode = eGet(handle, LJ_ioGET_AIN, 0, &voltage, 0);
 //    if (errorCode != LJE_NOERROR) {
-//      std::cout << "¶ÁÈ¡Ê§°Ü: " << errorCode << std::endl;
+//      std::cout << "è¯»å–å¤±è´¥: " << errorCode << std::endl;
 //      break;
 //    }
 //
-//    std::cout << "\rAI0µçÑ¹: " << voltage << "V" << std::flush;
-//    //Sleep(1);  // ĞİÃß1Ãë£¨»òÕßÆäËûÊÊµ±µÄÊ±¼ä£©
+//    std::cout << "\rAI0ç”µå‹: " << voltage << "V" << std::flush;
+//    //Sleep(1);  // ä¼‘çœ 1ç§’ï¼ˆæˆ–è€…å…¶ä»–é€‚å½“çš„æ—¶é—´ï¼‰
 //  }
 //
 //  
 //
 //
-//  for (int i = 0; i < 20||true; i++) {  // ³ÖĞø¶ÁÈ¡
+//  for (int i = 0; i < 20||true; i++) {  // æŒç»­è¯»å–
 //    double voltage = 0;
 //
-//    // ¶ÁÈ¡Ä£ÄâÊäÈëAI0µÄµçÑ¹
+//    // è¯»å–æ¨¡æ‹Ÿè¾“å…¥AI0çš„ç”µå‹
 //    errorCode = eGet(handle, LJ_ioGET_AIN, 0, &voltage, 0);
 //    if (errorCode != LJE_NOERROR) {
-//      std::cout << "¶ÁÈ¡Ê§°Ü: " << errorCode << std::endl;
+//      std::cout << "è¯»å–å¤±è´¥: " << errorCode << std::endl;
 //      break;
 //    }
 //
-//    std::cout << "\rAI0µçÑ¹: " << voltage << "V" << std::flush;
-//    // Sleep(1);  // ĞİÃß1Ãë£¨»òÕßÆäËûÊÊµ±µÄÊ±¼ä£©
+//    std::cout << "\rAI0ç”µå‹: " << voltage << "V" << std::flush;
+//    // Sleep(1);  // ä¼‘çœ 1ç§’ï¼ˆæˆ–è€…å…¶ä»–é€‚å½“çš„æ—¶é—´ï¼‰
 //  }
 //
-//  // ¹Ø±ÕÉè±¸
+//  // å…³é—­è®¾å¤‡
 //  //CloseLabJack(handle);
 //
 //  return 0;
@@ -98,7 +98,7 @@
 //  LJ_ERROR ljError;    // For storing LabJack error codes
 //  LJ_HANDLE ljHandle;  // LabJack device handle
 //
-//  // ´ò¿ªµÚÒ»¸öÕÒµ½µÄU3Éè±¸
+//  // æ‰“å¼€ç¬¬ä¸€ä¸ªæ‰¾åˆ°çš„U3è®¾å¤‡
 //  ljError = OpenLabJack(LJ_dtU3, LJ_ctUSB, "1", 1, &ljHandle);
 //  if (ljError != LJE_NOERROR) {
 //    std::cout << "Error opening LabJack: " << ljError << std::endl;
@@ -107,7 +107,7 @@
 //
 //  for (int r = 0; r < protocol.repetitions; r++) {
 //    for (const auto& op : protocol.operations) {
-//      // ÉèÖÃEIO×´Ì¬
+//      // è®¾ç½®EIOçŠ¶æ€
 //      for (int i = 0; i < 8; i++) {
 //        ljError = eDO(ljHandle, i+8, op.eioStates[i]);
 //        if (ljError != LJE_NOERROR) {
@@ -116,10 +116,10 @@
 //        }
 //      }
 //
-//      // µÈ´ıÖ¸¶¨µÄ³ÖĞøÊ±¼ä
+//      // ç­‰å¾…æŒ‡å®šçš„æŒç»­æ—¶é—´
 //      std::this_thread::sleep_for(std::chrono::milliseconds(op.duration_in_ms));
 //
-//      // ÖØÖÃEIO×´Ì¬£¨Èç¹ûĞèÒª£©¿ÉÒÔÔÚÕâÀïÌí¼Ó´úÂë
+//      // é‡ç½®EIOçŠ¶æ€ï¼ˆå¦‚æœéœ€è¦ï¼‰å¯ä»¥åœ¨è¿™é‡Œæ·»åŠ ä»£ç 
 //    }
 //  }
 //}
