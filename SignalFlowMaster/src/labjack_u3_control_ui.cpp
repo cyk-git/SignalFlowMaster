@@ -113,30 +113,43 @@ void LabJackU3ControlUI::Run(int row) {
 }
 
 void LabJackU3ControlUI::StartCollectSignal() {
-  controller_.CollectSignalDataAsync();
+  ui->pushButton_collect->setEnabled(false);
+  controller_.clear_errors();
 
-  //using Protocol = signal_flow_master::LabJackU3Controller::Protocol;
-  //using Operation = signal_flow_master::LabJackU3Controller::Operation;
+  QFuture<void> future =
+      QtConcurrent::run([=]() { controller_.CollectSignalData(); });
 
-  //Operation op1(100, {1, 1, 1, 1, 1, 1, 1, 1});
-  //Operation op2(100, {0, 0, 0, 0, 0, 0, 0, 0});
-  //Protocol pr(1, {op1, op2}, true);
-  //std::vector<Protocol> protocal_list({pr});
-
-  //controller_.ExecuteProtocolListAsync(protocal_list);
+  // Reset button when finished
+  auto watcher = new QFutureWatcher<void>(this);
+  connect(watcher, &QFutureWatcher<void>::finished, [=]() {
+    isCollecting_ = false;
+    ui->pushButton_collect->setText(tr("Start Signal Collecting"));
+    ui->label_collect->setText(tr("Not Collecting Signal"));
+    std::vector<std::string> vec_errors = controller_.get_errors();
+    if (!vec_errors.empty()) {
+      //this->setWindowFlag(Qt::WindowStaysOnTopHint, true);
+      this->activateWindow();
+      QMessageBox::critical(this, tr("Error When Collecting Signal Data"),
+                            QString::fromStdString(fmt::format(
+                                "{}", fmt::join(vec_errors, "\n"))));
+      //LOG_WARN("{}", fmt::join(vec_errors, "\n"));
+    }
+    watcher->deleteLater();  // Avoid memory leaky
+  });
+  watcher->setFuture(future);
 
   isCollecting_ = true;
   ui->pushButton_collect->setText(tr("Stop Signal Collecting"));
   ui->label_collect->setText(tr("Collecting Signal"));
+  ui->pushButton_collect->setEnabled(true);
+
+  // controller_.CollectSignalDataAsync();
 }
 
 void LabJackU3ControlUI::StopCollectSignal() {
   //controller_.InterruptProtocol();
   controller_.StopCollectData();
   //CollectSignalDataEnded();
-  isCollecting_ = false;
-  ui->pushButton_collect->setText(tr("Start Signal Collecting"));
-  ui->label_collect->setText(tr("Not Collecting Signal"));
 }
 
 void LabJackU3ControlUI::AddProtocol() {

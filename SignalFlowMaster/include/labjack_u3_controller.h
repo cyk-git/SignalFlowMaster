@@ -137,6 +137,8 @@ class LabJackU3Controller {
 
     void StoreSignalDataAsync(const StreamDataPack& data);
 
+    std::vector<std::string> GetErrors() const { return vec_errors_; }
+
     //static H5::DataSet create2DDataSet(H5::H5File& file,
     //                                   const std::string& name, int columns,
     //                                   H5::DataType type);
@@ -221,6 +223,8 @@ class LabJackU3Controller {
     }
   }
 
+  SignalData CollectOneSignalData();
+  void CollectSignalData();
   void CollectSignalDataAsync();
   void set_store_data(bool store) { flag_store_data_ = store; }
   void set_display_data(bool display) { flag_display_data_ = display; }
@@ -254,6 +258,9 @@ class LabJackU3Controller {
   void StartGetStreamData();
   void StopGetStreamData();
   StreamDataPack GetStreamDataPack();
+
+  std::vector<std::string> get_errors() const { return vec_errors_; }
+  void clear_errors() { vec_errors_.clear(); }
 
   static std::vector<DeviceInfo> FindAllDevices();
 
@@ -298,8 +305,8 @@ class LabJackU3Controller {
   std::string store_name_ = "exp";
   std::string store_format_ = ".h5";
 
-  SignalData CollectOneSignalData();
-  void CollectSignalData();
+  // Collect Errors
+  std::vector<std::string> vec_errors_;
 };
 }  // namespace signal_flow_master
 

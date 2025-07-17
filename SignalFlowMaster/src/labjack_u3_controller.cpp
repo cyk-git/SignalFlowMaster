@@ -541,12 +541,20 @@ void LabJackU3Controller::CollectSignalData() {
       }
     }
   } catch (std::exception& e) {
-    LOG_ERROR("Error occured when collecting signal.\n> {}", e.what());
+    std::string error_msg =
+        fmt::format("Error occured when collecting signal.\n> {}", e.what());
+    LOG_ERROR(error_msg);
+    vec_errors_.push_back(error_msg);
   }
   catch (...) {
-    LOG_ERROR("Unknown exception caught. Signal Collection End.");
+    std::string error_msg =
+        fmt::format("Unknown exception caught. Signal Collection End.");
+    LOG_ERROR(error_msg);
+    vec_errors_.push_back(error_msg);
   }
   StopGetStreamData();
+  auto storer_errors = storer.GetErrors();
+  vec_errors_.insert(vec_errors_.end(), storer_errors.begin(), storer_errors.end());
   //ptr_ui_->CollectSignalDataEnded();
 }
 
