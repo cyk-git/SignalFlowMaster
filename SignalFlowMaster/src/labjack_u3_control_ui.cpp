@@ -1,4 +1,4 @@
-#include "labjack_u3_control_ui.h"
+﻿#include "labjack_u3_control_ui.h"
 
 #include <CppToolkit\q_status_bar_sink.h>
 
@@ -112,6 +112,77 @@ void LabJackU3ControlUI::Run(int row) {
   return;
 }
 
+void LabJackU3ControlUI::MoveProtocolUp(int row) {
+  if (MoveBottomProtocolUp(row)) {
+    MoveTopProtocolDown(row - 1);
+  }
+}
+
+void LabJackU3ControlUI::MoveProtocolDown(int row) {
+  if (MoveTopProtocolDown(row)) {
+    MoveBottomProtocolUp(row + 1);
+  }
+}
+
+bool LabJackU3ControlUI::MoveBottomProtocolUp(int row) {
+  QScrollArea* scrollArea = ui->scrollArea_protocols;
+  QWidget* container = scrollArea->widget();
+  QGridLayout* layout = qobject_cast<QGridLayout*>(container->layout());
+  if (!layout || row <= 0) {
+    return false;
+  }
+
+  // Find widgets to swap
+  QLayoutItem* protocolItem = layout->itemAtPosition(row, 0);
+  //QLayoutItem* buttonItem = layout->itemAtPosition(row, 1);
+  if (!protocolItem/* || !buttonItem*/) {
+    return false;  // or log an error
+  }
+
+  QWidget* protocolWidget = protocolItem->widget();
+  //QWidget* buttonWidget = buttonItem->widget();
+
+  // Remove widgets from current position
+  layout->removeWidget(protocolWidget);
+  //layout->removeWidget(buttonWidget);
+
+  // Insert widgets at the new position (row - 1)
+  layout->addWidget(protocolWidget, row - 1, 0);
+  //layout->addWidget(buttonWidget, row - 1, 1);
+  return true;
+}
+
+bool LabJackU3ControlUI::MoveTopProtocolDown(int row) {
+  QScrollArea* scrollArea = ui->scrollArea_protocols;
+  QWidget* container = scrollArea->widget();
+  QGridLayout* layout = qobject_cast<QGridLayout*>(container->layout());
+  if (!layout || row >= layout->rowCount() - 1) {
+    return false;  // or log an error
+  }
+
+  // Find widgets to swap
+  QLayoutItem* protocolItem = layout->itemAtPosition(row, 0);
+  //QLayoutItem* buttonItem = layout->itemAtPosition(row, 1);
+  if (!protocolItem /*|| !buttonItem*/) {
+    return false;  // or log an error
+  }
+
+  QWidget* protocolWidget = protocolItem->widget();
+  //QWidget* buttonWidget = buttonItem->widget();
+
+  // Remove widgets from current position
+  layout->removeWidget(protocolWidget);
+  //layout->removeWidget(buttonWidget);
+
+  // Insert widgets at the new position (row + 1)
+  layout->addWidget(protocolWidget, row + 1, 0);
+  //layout->addWidget(buttonWidget, row + 1, 1);
+  return true;
+}
+
+
+
+
 void LabJackU3ControlUI::StartCollectSignal() {
   ui->pushButton_collect->setEnabled(false);
   controller_.clear_errors();
@@ -164,10 +235,22 @@ void LabJackU3ControlUI::AddProtocol() {
   ProtocolUI* protocol_ui = new ProtocolUI();
   QPushButton* deleteBtn = new QPushButton("Delete");
   QPushButton* runBtn = new QPushButton("Run");
+  QPushButton* upBtn = new QPushButton("^");
+  QPushButton* downBtn = new QPushButton("v");
+                                               
+  QGridLayout* btnLayout = new QGridLayout();  
+  btnLayout->addWidget(deleteBtn,0,0);             
+  btnLayout->addWidget(runBtn,1,0);
+  btnLayout->addWidget(upBtn,0,1);
+  btnLayout->addWidget(downBtn,1,1);
 
-  QVBoxLayout* btnLayout = new QVBoxLayout();
-  btnLayout->addWidget(deleteBtn);
-  btnLayout->addWidget(runBtn);
+  deleteBtn->setMinimumWidth(50);
+  runBtn->setMinimumWidth(50);
+  upBtn->setMinimumWidth(20);
+  downBtn->setMinimumWidth(20);
+  upBtn->setToolTip(tr("Move Protocol Up"));
+  downBtn->setToolTip(tr("Move Protocol Down"));
+  //btnLayout->setColumnStretch(0, 1);  // Make delete and run buttons stretch
 
   QWidget* btnContainer = new QWidget();
   btnContainer->setLayout(btnLayout);
@@ -176,12 +259,16 @@ void LabJackU3ControlUI::AddProtocol() {
 
   layout->addWidget(protocol_ui, row, 0);
   layout->addWidget(btnContainer, row, 1);
-
+  layout->setColumnStretch(0, 1);
   // Connect the deleteBtn to DeleteProtocol
   connect(deleteBtn, &QPushButton::clicked, [=]() { DeleteProtocol(row); });
 
   // Connect the runBtn to Run
   connect(runBtn, &QPushButton::clicked, [=]() { Run(row); });
+
+  connect(upBtn, &QPushButton::clicked, [=]() { MoveProtocolUp(row); });
+
+  connect(downBtn, &QPushButton::clicked, [=]() { MoveProtocolDown(row); });
 }
 
 LabJackU3ControlUI::Protocol LabJackU3ControlUI::GetProtocol(int row) {

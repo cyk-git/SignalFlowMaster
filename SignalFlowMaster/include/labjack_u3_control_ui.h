@@ -39,6 +39,9 @@ class LabJackU3ControlUI : public QMainWindow
   Protocol GetProtocol(int row);
   std::vector<Protocol> GetAllProtocol();
   void RunProtocolListAsync(const std::vector<Protocol>& vec_protocol);
+  bool MoveBottomProtocolUp(int row);
+  bool MoveTopProtocolDown(int row);
+
 
  private slots:
   void on_pushButton_storePath_clicked();
@@ -48,6 +51,8 @@ class LabJackU3ControlUI : public QMainWindow
   void on_pushButton_runAll_clicked();
   void DeleteProtocol(int row);
   void Run(int row);
+  void MoveProtocolUp(int row);
+  void MoveProtocolDown(int row);
 
  private:
   BrowseDeviceUI *ptr_mainwindow;
