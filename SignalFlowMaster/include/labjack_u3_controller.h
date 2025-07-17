@@ -27,6 +27,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <QString>
 
 //#include "labjack_u3_ctrl_ui_interface.h"
 
@@ -120,7 +121,7 @@ class LabJackU3Controller {
 
   class SignalDataStorer : public cpptoolkit::AsyncConsumer {
    public:
-    explicit SignalDataStorer(std::string store_path)
+    explicit SignalDataStorer(QString store_path)
         : kStorePath_(store_path) {}
     ~SignalDataStorer() { Close(); }
     // Disallow copy and move
@@ -151,7 +152,7 @@ class LabJackU3Controller {
    protected:
     std::queue<std::unique_ptr<StreamDataPack>> queue_data_buffer_;
     std::unique_ptr<StreamDataPack> loaded_data_ = nullptr;
-    const std::string kStorePath_;
+    const QString kStorePath_;
 
     // virtual void ConsumerLoop() { LOG_DEBUG("test"); }
     virtual void Start() override;

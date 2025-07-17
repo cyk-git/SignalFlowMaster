@@ -1,6 +1,7 @@
 #include "labjack_u3_controller.h"
 
 #include <CppToolkit\date_time.h>
+#include <CppToolkit\qt_file_operations.h>
 
 #include <algorithm>
 #include <bitset>
@@ -59,9 +60,11 @@ void LabJackU3Controller::SignalDataStorer::Start() {
 void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
   // Create a new HDF5 file
   try {
-    LOG_INFO("Data store: {}", kStorePath_);
-    cpptoolkit::SafeHighFiveFile file_safe(kStorePath_, HighFive::File::Create);
-    writeMetadataToH5File(file_safe.get(), actual_scan_rate_);
+    LOG_INFO("Data store: {}", kStorePath_.toStdString());
+    // QString store_root_path = "F:/cyk/debug/labjack";
+    cpptoolkit::create_directory_if_needed(kStorePath_);
+    //cpptoolkit::SafeHighFiveFile file_safe(kStorePath_, HighFive::File::Create);
+    /*writeMetadataToH5File(file_safe.get(), actual_scan_rate_);*/
   } catch (std::exception& e) {
     try {
       LOG_ERROR("Error when PrepareH5File: {}", e.what());
@@ -210,15 +213,28 @@ void LabJackU3Controller::SignalDataStorer::ProcessData() {
 void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
   // LOG_DEBUG("[Consumer Process]First elem: {}",loaded_data_->ain_votage[0]);
   const auto& data = *loaded_data_;
-  {
-    cpptoolkit::SafeHighFiveFile file_safe(kStorePath_,
-                                           HighFive::File::ReadWrite);
-    HighFive::File& file = file_safe.get();
-    std::string batch_name = fmt::format("{:08d}", batch_num_++);
-    xt::dump(file, "ain_voltage/" + batch_name, data.vec_ain_data);
-    xt::dump(file, "dout_states/" + batch_name, data.vec_dout_data);
-    xt::dump(file, "din_states/" + batch_name, data.vec_din_data);
-    xt::dump(file, "counter/" + batch_name, data.vec_counter_data);
+  try {
+    QString filename =
+        QString::fromStdString(fmt::format("{:08d}.h5", batch_num_++));
+    QString temp_path =
+        cpptoolkit::generate_temp_file_path(kStorePath_, ".labjacktemp");
+    QString file_path = cpptoolkit::generate_file_path(kStorePath_, filename);
+
+    {
+      cpptoolkit::SafeHighFiveFile file_safe(temp_path.toStdString(),
+                                             HighFive::File::Create);
+      HighFive::File& file = file_safe.get();
+      writeMetadataToH5File(file, actual_scan_rate_);
+      xt::dump(file, "ain_voltage", data.vec_ain_data);
+      xt::dump(file, "dout_states", data.vec_dout_data);
+      xt::dump(file, "din_states", data.vec_din_data);
+      xt::dump(file, "counter", data.vec_counter_data);
+    }
+
+    cpptoolkit::rename_temp_file(temp_path, file_path);
+  } catch (std::runtime_error& e) {
+    LOG_ERROR("Error when SaveDataToH5File: {}", e.what());
+    vec_errors_.push_back("Error when SaveDataToH5File");
   }
 }
 
@@ -495,8 +511,9 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
 void LabJackU3Controller::CollectSignalData() {
   // SignalData current_data;
   StreamDataPack current_data_pack;
-  SignalDataStorer storer(store_dir_ + cpptoolkit::DateTime().date_time() +
-                          "_" + store_name_ + store_format_);
+  SignalDataStorer storer(
+      QString::fromStdString(store_dir_ + cpptoolkit::DateTime().date_time() +
+                             "_" + store_name_ + store_format_));
   // LOG_INFO(full_path.string());
   flag_collect_data_ = true;
   // Stream Mode
