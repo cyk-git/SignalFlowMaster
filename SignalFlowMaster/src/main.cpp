@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   cpptoolkit::InitLogger("logs", cpptoolkit::GetLogFileName("_log.txt"),
-                   spdlog::level::trace,spdlog::level::info);
+                   spdlog::level::debug,spdlog::level::debug);
   BrowseDeviceUI w;
   w.show();
   w.FindDevice();

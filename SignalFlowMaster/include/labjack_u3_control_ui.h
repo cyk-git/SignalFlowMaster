@@ -29,7 +29,7 @@ class LabJackU3ControlUI : public QMainWindow,
   virtual void CollectSignalDataEnded() {
     isCollecting_ = false;
     ui->pushButton_collect->setText(tr("Start Signal Collecting"));
-    ui->label_collect->setText(tr("Not Collecting Signal"));
+    //ui->label_collect->setText(tr("Not Collecting Signal"));
   }
 
   void StartCollectSignal();

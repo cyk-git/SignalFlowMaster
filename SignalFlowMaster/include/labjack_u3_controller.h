@@ -13,7 +13,8 @@
 #include <CppToolkit\async_consumer.h>
 #include <CppToolkit\handle_exception.h>
 #include <CppToolkit\locks.h>
-#include <H5Cpp.h>
+#include <CppToolkit\hdf5_toolkit_core.h>
+//#include <H5Cpp.h>
 #include <LabJackUD.h>
 
 #include <array>
@@ -40,10 +41,10 @@ struct DeviceInfo {
 
 class LabJackU3Controller {
  public:                             // Define Structs
-  static const int kNumAIn = 4;      // AIO 0-3
-  static const int kNumDOut = 8;     // EIO 0-7
-  static const int kNumDIn = 4;      // CIO 0-3
-  static const int kNumCounter = 2;  // FIO 4-5
+  static const size_t kNumAIn = 4;      // AIO 0-3
+  static const size_t kNumDOut = 8;  // EIO 0-7
+  static const size_t kNumDIn = 4;      // CIO 0-3
+  static const size_t kNumCounter = 2;  // FIO 4-5
 
   // Using int_bool as an alternative to std::vector<bool> which is a
   // specialized template that does not behave like a standard STL container.
@@ -59,16 +60,29 @@ class LabJackU3Controller {
   using int_bool = int8_t;
   static_assert(sizeof(int_bool) == sizeof(bool),
                 "int_bool must be the same size as bool");
+  //struct StreamDataPack {
+  //  int pack_size;
+  //  std::vector<double> vec_ain_data = std::vector<double>(kNumAIn * pack_size);
+  //  std::vector<int_bool> vec_dout_data =
+  //      std::vector<int_bool>(kNumDOut * pack_size);
+  //  std::vector<int_bool> vec_din_data =
+  //      std::vector<int_bool>(kNumDIn * pack_size);
+  //  std::vector<uint32_t> vec_counter_data =
+  //      std::vector<uint32_t>(kNumCounter * pack_size);
+  //  explicit StreamDataPack(int _pack_size = 0) : pack_size(_pack_size) {}
+  //};
   struct StreamDataPack {
-    int pack_size;
-    std::vector<double> vec_ain_data = std::vector<double>(kNumAIn * pack_size);
-    std::vector<int_bool> vec_dout_data =
-        std::vector<int_bool>(kNumDOut * pack_size);
-    std::vector<int_bool> vec_din_data =
-        std::vector<int_bool>(kNumDIn * pack_size);
-    std::vector<uint32_t> vec_counter_data =
-        std::vector<uint32_t>(kNumCounter * pack_size);
-    explicit StreamDataPack(int _pack_size = 0) : pack_size(_pack_size) {}
+    size_t pack_size;
+    xt::xtensor<double, 2> vec_ain_data;
+    xt::xtensor<int_bool, 2> vec_dout_data;
+    xt::xtensor<int_bool, 2> vec_din_data;
+    xt::xtensor<uint32_t, 2> vec_counter_data;
+    explicit StreamDataPack(size_t _pack_size = 0)
+        : pack_size(_pack_size),
+          vec_ain_data({_pack_size, kNumAIn}),
+          vec_dout_data({_pack_size, kNumDOut}),
+          vec_din_data({_pack_size, kNumDIn}),
+          vec_counter_data({_pack_size, kNumCounter}) {}
   };
 
   struct Operation {
@@ -122,14 +136,16 @@ class LabJackU3Controller {
 
     void StoreSignalDataAsync(const StreamDataPack& data);
 
-    static H5::DataSet create2DDataSet(H5::H5File& file,
-                                       const std::string& name, int columns,
-                                       H5::DataType type);
-    static void extendDataSet(H5::DataSet& dataset, int rank, hsize_t newSize);
-    template <typename T>
-    static void writeDataToDataSet(H5::DataSet& dataset, int columns, int rows,
-                                   const H5::DataType& mem_type, const T* data);
-    static void writeMetadataToH5File(H5::H5File& file,
+    //static H5::DataSet create2DDataSet(H5::H5File& file,
+    //                                   const std::string& name, int columns,
+    //                                   H5::DataType type);
+    //static void extendDataSet(H5::DataSet& dataset, int rank, hsize_t newSize);
+    //template <typename T>
+    //static void writeDataToDataSet(H5::DataSet& dataset, int columns, int rows,
+    //                               const H5::DataType& mem_type, const T* data);
+    //static void writeMetadataToH5File(H5::H5File& file,
+    //                                  double actual_scan_rate);
+    static void writeMetadataToH5File(HighFive::File& file,
                                       double actual_scan_rate);
 
    protected:
@@ -152,17 +168,28 @@ class LabJackU3Controller {
 
    private:
     double actual_scan_rate_ = -1;
-    H5::H5File file_;
-    H5::DataSet dataset_ain_voltage_;
-    H5::DataSet dataset_dout_states_;
-    H5::DataSet dataset_din_states_;
-    H5::DataSet dataset_counter_;
+
+    // Store all data into one file
+    //H5::H5File file_;
+    //H5::DataSet dataset_ain_voltage_;
+    //H5::DataSet dataset_dout_states_;
+    //H5::DataSet dataset_din_states_;
+    //H5::DataSet dataset_counter_;
+
+    void PrepareH5File();
+    void SaveDataToH5File();
+
     // H5::DataSet dataset_time_;
     // H5::DataSet dataset_voltage_;
     // H5::DataSet dataset_states_;
     // H5::DataSet dataset_count_;
     hsize_t dims_[1] = {0};
     // void GetData(std::unique_ptr<int[]> data_ptr);
+
+    // Handel Errors
+    std::vector<std::string> vec_errors_;
+    
+    int64_t batch_num_=0;
   };
 
  public:
