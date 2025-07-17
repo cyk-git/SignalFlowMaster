@@ -14,7 +14,7 @@ LabJackU3ControlUI::LabJackU3ControlUI(const std::string& address,
       QMainWindow(parent, Qt::Window),
       ui(new Ui::LabJackU3ControlUIClass()),
       ptr_mainwindow(parent),
-      controller_(address, this) {
+      controller_(address/*, this*/) {
   ui->setupUi(this);
   ::cpptoolkit::AddQStatusBarSink(statusBar());
   // Set default store path
@@ -133,7 +133,10 @@ void LabJackU3ControlUI::StartCollectSignal() {
 void LabJackU3ControlUI::StopCollectSignal() {
   //controller_.InterruptProtocol();
   controller_.StopCollectData();
-  CollectSignalDataEnded();
+  //CollectSignalDataEnded();
+  isCollecting_ = false;
+  ui->pushButton_collect->setText(tr("Start Signal Collecting"));
+  ui->label_collect->setText(tr("Not Collecting Signal"));
 }
 
 void LabJackU3ControlUI::AddProtocol() {

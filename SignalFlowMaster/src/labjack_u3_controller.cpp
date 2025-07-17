@@ -530,7 +530,7 @@ void LabJackU3Controller::CollectSignalData() {
     LOG_ERROR("Unknown exception caught. Signal Collection End.");
   }
   StopGetStreamData();
-  ptr_ui_->CollectSignalDataEnded();
+  //ptr_ui_->CollectSignalDataEnded();
 }
 
 void LabJackU3Controller::SetUpAIns() {

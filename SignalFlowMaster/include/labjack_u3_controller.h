@@ -28,7 +28,7 @@
 #include <thread>
 #include <vector>
 
-#include "labjack_u3_ctrl_ui_interface.h"
+//#include "labjack_u3_ctrl_ui_interface.h"
 
 #define CHECK_LABJACK_API_ERROR(errorCode, operationName, level) \
   CPPTOOLKIT_CHECK_API_ERRORCODE(errorCode, LJE_NOERROR, operationName, level)
@@ -193,9 +193,9 @@ class LabJackU3Controller {
   };
 
  public:
-  explicit LabJackU3Controller(const std::string& address,
-                               LabJackU3CtrlUIInterface* ptr_ui)
-      : kAddress_(address), ptr_ui_(ptr_ui) {}
+  explicit LabJackU3Controller(const std::string& address
+                               /*,LabJackU3CtrlUIInterface* ptr_ui*/)
+      : kAddress_(address) /*,ptr_ui_(ptr_ui)*/ {}
   ~LabJackU3Controller() { CloseDevice(); }
   // Disallow copy and move
   LabJackU3Controller(const LabJackU3Controller&) = delete;
@@ -257,7 +257,7 @@ class LabJackU3Controller {
   static std::vector<DeviceInfo> FindAllDevices();
 
  private:
-  LabJackU3CtrlUIInterface* ptr_ui_;
+  //LabJackU3CtrlUIInterface* ptr_ui_;
   const long kDeviceType_ = LJ_dtU3;
   const long kConnectionType_ = LJ_ctUSB;
   const ::cpptoolkit::ErrorLevel kDefaultLevel =

@@ -112,7 +112,6 @@
     <QtUic Include="..\..\form\protocol_ui.ui" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\labjack_u3_ctrl_ui_interface.h" />
     <ClInclude Include="..\..\res\resource.h" />
     <ClInclude Include="resource1.h" />
     <ClInclude Include="resource2.h" />
