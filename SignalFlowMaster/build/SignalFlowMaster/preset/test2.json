@@ -1,0 +1,68 @@
+{
+    "protocols": [
+        {
+            "infinite_repetition": false,
+            "operations": [
+                {
+                    "duration_in_ms": 100,
+                    "eioStates": [
+                        true,
+                        false,
+                        true,
+                        false,
+                        true,
+                        false,
+                        true,
+                        false
+                    ]
+                },
+                {
+                    "duration_in_ms": 200,
+                    "eioStates": [
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true
+                    ]
+                },
+                {
+                    "duration_in_ms": 100,
+                    "eioStates": [
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false
+                    ]
+                }
+            ],
+            "repetitions": 4
+        },
+        {
+            "infinite_repetition": false,
+            "operations": [
+                {
+                    "duration_in_ms": 1000,
+                    "eioStates": [
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false
+                    ]
+                }
+            ],
+            "repetitions": 1
+        }
+    ]
+}

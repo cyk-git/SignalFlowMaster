@@ -12,7 +12,7 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>500</width>
+    <width>560</width>
     <height>0</height>
    </size>
   </property>
@@ -71,6 +71,9 @@
        <number>0</number>
       </property>
       <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
        <number>0</number>
       </property>
      </layout>

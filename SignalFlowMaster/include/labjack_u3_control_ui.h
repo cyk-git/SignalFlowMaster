@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "labjack_u3_controller.h"
+#include "protocol_ui.h"
 //#include "labjack_u3_ctrl_ui_interface.h"
 #include "ui_labjack_u3_control_ui.h"
 #include "mainwindow.h"
@@ -50,6 +51,8 @@ class LabJackU3ControlUI : public QMainWindow
   void DeleteAllProtocol();
   void AddProtocol(const Protocol &protocol);
   void AddProtocolsFromFile(bool clear_before_add);
+  //std::vector<ProtocolUI *> GetAllProtocolUI();
+  //void SelectHighlightOperation(QUuid uuid, bool highlighted);
 
  protected:
   void closeEvent(QCloseEvent *event) override;
@@ -72,6 +75,8 @@ private slots:
   void AddProtocolList();
   void UpdateRunProgress();
   void SetOpUnit(double unit);
+  //void HighlightOp(QUuid uuid);
+  //void DeHighlightOp(QUuid uuid);
 
  private:
   BrowseDeviceUI *ptr_mainwindow;

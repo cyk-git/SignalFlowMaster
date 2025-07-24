@@ -52,6 +52,8 @@ class LabJackU3Controller:public QObject {
  public:
  signals:
   void errorCollect(QStringList vec_errors_collect);
+  void StartOperation(QUuid uuid);
+  void FinishOperation(QUuid uuid);
 
  public: 
   static const size_t kNumAIn = 4;      // AIO 0-3
@@ -100,13 +102,16 @@ class LabJackU3Controller:public QObject {
   };
 
   struct Operation {
+    QUuid uuid;
     int duration_in_ms;               // duration time in ms
     std::bitset<kNumDOut> eioStates;  // 8 EIO Digital output states
 
-    Operation(int duration_in_ms = 0, uint64_t _eioStates = 0b00000000)
+    Operation(int duration_in_ms = 0, uint64_t _eioStates = 0b00000000,
+              QUuid _uuid = QUuid())
         : duration_in_ms(duration_in_ms), eioStates(_eioStates) {}
-    Operation(int duration_in_ms, std::array<bool, kNumDOut> _eioStates)
-        : duration_in_ms(duration_in_ms) {
+    Operation(int duration_in_ms, std::array<bool, kNumDOut> _eioStates,
+              QUuid _uuid = QUuid())
+        : duration_in_ms(duration_in_ms), uuid(_uuid) {
       for (int i = 0; i < kNumDOut; i++) {
         eioStates.set(i, _eioStates.at(i));
       }

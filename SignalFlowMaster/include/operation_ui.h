@@ -24,6 +24,25 @@ class OperationUI : public QWidget {
 
   void setEnabled(bool enabled);
 
+  void setHighlighted(bool highlighted) {
+    if (highlighted) {
+      //ui->label->setStyleSheet("background-color: yellow;");
+      ui->widget_container->setStyleSheet(
+          "color: rgb(255, 255, 255);\nbackground-color: rgb(0, 170, 0);");
+    } else {
+      //ui->label->setStyleSheet("");
+      ui->widget_container->setStyleSheet("");
+    }
+  }
+
+  public slots:
+  void selectSetHighlighted(QUuid uuid, bool highlighted) { 
+    if (uuid_ == uuid) {
+      setHighlighted(highlighted);
+    }
+  }
+
  private:
   Ui::OperationUIClass *ui;
+  QUuid uuid_;
 };

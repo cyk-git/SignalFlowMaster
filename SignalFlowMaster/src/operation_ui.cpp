@@ -3,6 +3,7 @@
 OperationUI::OperationUI(QWidget *parent)
     : QWidget(parent), ui(new Ui::OperationUIClass()) {
   ui->setupUi(this);
+  uuid_ = QUuid::createUuid();
 }
 
 OperationUI::~OperationUI() { delete ui; }
@@ -27,7 +28,7 @@ OperationUI::Operation OperationUI::GetOperation() {
       ui->checkBox_5->isChecked(), ui->checkBox_6->isChecked(),
       ui->checkBox_7->isChecked(), ui->checkBox_8->isChecked(),
   };
-  return Operation(duration_in_ms, eioStates);
+  return Operation(duration_in_ms, eioStates, uuid_);
 }
 
 void OperationUI::setEnabled(bool enabled) {
@@ -41,3 +42,4 @@ void OperationUI::setEnabled(bool enabled) {
   ui->checkBox_7->setEnabled(enabled);
   ui->checkBox_8->setEnabled(enabled);
 }
+

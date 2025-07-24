@@ -682,6 +682,7 @@ void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
   if (!flag_execute_protocol_) {
     return;
   }
+  emit StartOperation(operation.uuid);
   errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8,
                          operation.eioStates.to_ulong(), kNumDOut, 0);
   CHECK_LABJACK_API_ERROR(
@@ -704,6 +705,7 @@ void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
   //                       std::chrono::milliseconds(operation.duration_in_ms),
   //                       [this] { return !flag_execute_protocol_; });
   sleep_waiter.sleep_for(operation.duration_in_ms);
+  emit FinishOperation(operation.uuid);
 }
 
 void LabJackU3Controller::ExecuteProtocol(const Protocol& protocol) {

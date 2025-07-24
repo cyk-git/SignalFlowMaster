@@ -166,6 +166,18 @@ void LabJackU3ControlUI::SetOpUnit(double unit) {
   LOG_INFO("Operation unit set to {} seconds",unit);
 }
 
+//void LabJackU3ControlUI::HighlightOp(QUuid uuid) {
+//  LOG_DEBUG("HighlightOp {} ", uuid.toString().toStdString());
+//  SelectHighlightOperation(uuid, true);
+//  //LOG_TRACE("Start Op{}", uuid.toString().toStdString());
+//}
+//
+//void LabJackU3ControlUI::DeHighlightOp(QUuid uuid) {
+//  LOG_DEBUG("DeHighlightOp {} ", uuid.toString().toStdString());
+//  SelectHighlightOperation(uuid, false);
+//  //LOG_TRACE("Finish Op{}", uuid.toString().toStdString());
+//}
+
 void LabJackU3ControlUI::setupConnections() {
   connect(ui->pushButton_storePath, &QPushButton::clicked, this,
           &LabJackU3ControlUI::BrowseSaveRootPath);
@@ -191,6 +203,10 @@ void LabJackU3ControlUI::setupConnections() {
   connect(ui->doubleSpinBox_opUnit,
           QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
           &LabJackU3ControlUI::SetOpUnit);
+  //connect(&controller_, &signal_flow_master::LabJackU3Controller::StartOperation, this,
+  //        &LabJackU3ControlUI::HighlightOp);
+  //connect(&controller_, &signal_flow_master::LabJackU3Controller::FinishOperation, this,
+  //        &LabJackU3ControlUI::DeHighlightOp);
 }
 
 QString LabJackU3ControlUI::formatTime(int64_t ms) {
@@ -326,6 +342,11 @@ void LabJackU3ControlUI::AddProtocol(const Protocol& protocol) {
   connect(upBtn, &QPushButton::clicked, [=]() { MoveProtocolUp(row); });
 
   connect(downBtn, &QPushButton::clicked, [=]() { MoveProtocolDown(row); });
+
+  connect(&controller_, &signal_flow_master::LabJackU3Controller::StartOperation,
+          protocol_ui, &ProtocolUI::SelectHighlightOp);
+  connect(&controller_, &signal_flow_master::LabJackU3Controller::FinishOperation,
+          protocol_ui, &ProtocolUI::SelectDeHighlightOp);
 }
 
 void LabJackU3ControlUI::AddProtocolsFromFile(bool clear_before_add) {
@@ -346,6 +367,38 @@ void LabJackU3ControlUI::AddProtocolsFromFile(bool clear_before_add) {
     }
   }
 }
+
+//std::vector<ProtocolUI*> LabJackU3ControlUI::GetAllProtocolUI() {
+//  std::vector<ProtocolUI*> vec_protocols;
+//  QScrollArea* scrollArea = ui->scrollArea_protocols;
+//  QWidget* container = scrollArea->widget();
+//  QGridLayout* layout = qobject_cast<QGridLayout*>(container->layout());
+//  if (!layout) {
+//    return vec_protocols;  // or log an error
+//  }
+//
+//  // Clear all items in the layout
+//  while (QLayoutItem* item = layout->takeAt(0)) {
+//    ProtocolUI* protocolUI = qobject_cast<ProtocolUI*>(item->widget());
+//    if (protocolUI) {
+//      vec_protocols.push_back(protocolUI);
+//    }
+//  }
+//  return vec_protocols;
+//}
+
+//void LabJackU3ControlUI::SelectHighlightOperation(QUuid uuid,
+//                                                  bool highlighted) {
+//  std::vector<ProtocolUI*> vec_protocol_ui = GetAllProtocolUI();
+//  for (auto protocol_ui : vec_protocol_ui) {
+//    std::vector<OperationUI*> vec_op_ui = protocol_ui->GetAllOperationUI();
+//    for (auto op_ui : vec_op_ui) {
+//      LOG_DEBUG("set op {} highlighted: {}", uuid.toString().toStdString(),
+//                highlighted);
+//      op_ui->selectSetHighlighted(uuid, highlighted);
+//    }
+//  }
+//}
 
 void LabJackU3ControlUI::closeEvent(QCloseEvent* event) {
   int result = QMessageBox::question(

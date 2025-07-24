@@ -91,6 +91,8 @@ void ProtocolUI::AddOperation(const Operation& operation) {
   // Connect the button to DeleteOperation
   // Assuming 'this' is the object where DeleteOperation is defined
   connect(btn, &QPushButton::clicked, [=]() { DeleteOperation(row); });
+  connect(this, &ProtocolUI::selectSetOpHighlight, operation_ui,
+          &OperationUI::selectSetHighlighted);
 }
 
 void ProtocolUI::AddOperation() {
@@ -111,6 +113,21 @@ void ProtocolUI::DeleteAllOperation() {
   }
 }
 
+//std::vector<OperationUI*> ProtocolUI::GetAllOperationUI() {
+//  std::vector<OperationUI*> operation_uis;
+//  QFrame* frame = ui->frame_operations;
+//  QGridLayout* layout = qobject_cast<QGridLayout*>(frame->layout());
+//  if (!layout) return operation_uis;
+//  // Clear all items in the layout
+//  while (QLayoutItem* item = layout->takeAt(0)) {
+//    OperationUI* op = qobject_cast<OperationUI*>(item->widget());
+//    if (op) {
+//      operation_uis.push_back(op);
+//    }
+//  }
+//  return operation_uis;
+//}
+
 void ProtocolUI::DeleteOperation(int row) {
   QFrame* frame = ui->frame_operations;
   QGridLayout* layout = qobject_cast<QGridLayout*>(frame->layout());
@@ -125,4 +142,12 @@ void ProtocolUI::DeleteOperation(int row) {
       delete widget;                 // delete the QWidget
     }
   }
+}
+
+void ProtocolUI::SelectHighlightOp(QUuid uuid) {
+  emit selectSetOpHighlight(uuid, true);
+}
+
+void ProtocolUI::SelectDeHighlightOp(QUuid uuid) {
+  emit selectSetOpHighlight(uuid, false);
 }
