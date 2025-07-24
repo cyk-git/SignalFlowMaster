@@ -9,14 +9,14 @@ OperationUI::~OperationUI() { delete ui; }
 
 void OperationUI::PutOperation(const OperationUI::Operation &operation) {
   ui->doubleSpinBox_duration->setValue(operation.duration_in_ms / 1000.0);
-  ui->checkBox_1->setChecked(operation.eioStates[1]);
-  ui->checkBox_2->setChecked(operation.eioStates[2]);
-  ui->checkBox_3->setChecked(operation.eioStates[3]);
-  ui->checkBox_4->setChecked(operation.eioStates[4]);
-  ui->checkBox_5->setChecked(operation.eioStates[5]);
-  ui->checkBox_6->setChecked(operation.eioStates[6]);
-  ui->checkBox_7->setChecked(operation.eioStates[7]);
-  ui->checkBox_8->setChecked(operation.eioStates[8]);
+  ui->checkBox_1->setChecked(operation.eioStates[0]);
+  ui->checkBox_2->setChecked(operation.eioStates[1]);
+  ui->checkBox_3->setChecked(operation.eioStates[2]);
+  ui->checkBox_4->setChecked(operation.eioStates[3]);
+  ui->checkBox_5->setChecked(operation.eioStates[4]);
+  ui->checkBox_6->setChecked(operation.eioStates[5]);
+  ui->checkBox_7->setChecked(operation.eioStates[6]);
+  ui->checkBox_8->setChecked(operation.eioStates[7]);
 }
 
 OperationUI::Operation OperationUI::GetOperation() {

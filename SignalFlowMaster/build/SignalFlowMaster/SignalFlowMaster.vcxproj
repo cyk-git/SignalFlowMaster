@@ -120,7 +120,7 @@
     <QtMoc Include="..\..\include\protocol_ui.h" />
     <QtMoc Include="..\..\include\operation_ui.h" />
     <QtMoc Include="..\..\include\labjack_u3_control_ui.h" />
-    <ClInclude Include="..\..\include\labjack_u3_controller.h" />
+    <QtMoc Include="..\..\include\labjack_u3_controller.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SignalFlowMasterRes.rc" />

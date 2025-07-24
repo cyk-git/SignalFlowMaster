@@ -2,6 +2,7 @@
 
 #include <CppToolkit\date_time.h>
 #include <CppToolkit\qt_file_operations.h>
+#include <CppToolkit\qjson_save_and_load.h>
 
 #include <algorithm>
 #include <bitset>
@@ -16,7 +17,9 @@ void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
     for (const auto& error : vec_errors_) {
       error_message += error + "\n";
     }
-    throw std::runtime_error("SignalDataStorer has errors, can't store data.\nDetial:\n"+error_message);
+    throw std::runtime_error(
+        "SignalDataStorer has errors, can't store data.\nDetial:\n" +
+        error_message);
   }
 
   PreGetData();
@@ -35,21 +38,21 @@ void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
     }
   }
   PostGetData();
-
 }
 
-//H5::DataSet LabJackU3Controller::SignalDataStorer::create2DDataSet(
-//    H5::H5File& file, const std::string& name, int columns, H5::DataType type) {
-//  hsize_t dims[2] = {1, columns};
-//  hsize_t maxDims[2] = {H5S_UNLIMITED, columns};
-//  H5::DataSpace dataspace(2, dims, maxDims);
+// H5::DataSet LabJackU3Controller::SignalDataStorer::create2DDataSet(
+//     H5::H5File& file, const std::string& name, int columns, H5::DataType
+//     type) {
+//   hsize_t dims[2] = {1, columns};
+//   hsize_t maxDims[2] = {H5S_UNLIMITED, columns};
+//   H5::DataSpace dataspace(2, dims, maxDims);
 //
-//  H5::DSetCreatPropList prop_list;
-//  hsize_t chunkDims[2] = {1, columns};
-//  prop_list.setChunk(2, chunkDims);
+//   H5::DSetCreatPropList prop_list;
+//   hsize_t chunkDims[2] = {1, columns};
+//   prop_list.setChunk(2, chunkDims);
 //
-//  return file.createDataSet(name, type, dataspace, prop_list);
-//}
+//   return file.createDataSet(name, type, dataspace, prop_list);
+// }
 
 void LabJackU3Controller::SignalDataStorer::Start() {
   // Create a new HDF5 file
@@ -63,7 +66,8 @@ void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
     LOG_INFO("Data store: {}", kStorePath_.toStdString());
     // QString store_root_path = "F:/cyk/debug/labjack";
     cpptoolkit::create_directory_if_needed(kStorePath_);
-    //cpptoolkit::SafeHighFiveFile file_safe(kStorePath_, HighFive::File::Create);
+    // cpptoolkit::SafeHighFiveFile file_safe(kStorePath_,
+    // HighFive::File::Create);
     /*writeMetadataToH5File(file_safe.get(), actual_scan_rate_);*/
   } catch (std::exception& e) {
     try {
@@ -82,7 +86,7 @@ void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
   }
   // file_.close();
 }
-  //void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
+// void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
 //  // Create a new HDF5 file
 //  try {
 //    kStorePath_ = "F:/test.h5";
@@ -121,62 +125,62 @@ void LabJackU3Controller::SignalDataStorer::PrepareH5File() {
 //  // file_.close();
 //}
 
-
 void LabJackU3Controller::SignalDataStorer::Close() {
   cpptoolkit::AsyncConsumer::Close();
-  //try {
-  //  file_.close();
-  //} catch (std::exception& e) {
-  //  LOG_ERROR("Error when close file: {}", e.what());
-  //}
+  // try {
+  //   file_.close();
+  // } catch (std::exception& e) {
+  //   LOG_ERROR("Error when close file: {}", e.what());
+  // }
 }
 
 void LabJackU3Controller::SignalDataStorer::LoadDataForProcess() {
   loaded_data_ = std::move(queue_data_buffer_.front());
   queue_data_buffer_.pop();
 }
-//void LabJackU3Controller::SignalDataStorer::extendDataSet(H5::DataSet& dataset,
-//                                                          int rank,
-//                                                          hsize_t newSize) {
-//  std::vector<hsize_t> currentDims(rank);
-//  dataset.getSpace().getSimpleExtentDims(
-//      currentDims.data());   // Get current dim size
-//  currentDims[0] = newSize;  // Change first dim size
+// void LabJackU3Controller::SignalDataStorer::extendDataSet(H5::DataSet&
+// dataset,
+//                                                           int rank,
+//                                                           hsize_t newSize) {
+//   std::vector<hsize_t> currentDims(rank);
+//   dataset.getSpace().getSimpleExtentDims(
+//       currentDims.data());   // Get current dim size
+//   currentDims[0] = newSize;  // Change first dim size
 //
-//  dataset.extend(currentDims.data());  // Extend dataset
-//}
+//   dataset.extend(currentDims.data());  // Extend dataset
+// }
 
-//void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
-//    H5::H5File& file, double actual_scan_rate) {
-//  // Get the current time including milliseconds
-//  auto now = std::chrono::system_clock::now();
-//  auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
-//  std::stringstream ss;
-//  ss << std::put_time(std::localtime(&now_as_time_t), "%Y-%m-%d %H:%M:%S");
+// void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
+//     H5::H5File& file, double actual_scan_rate) {
+//   // Get the current time including milliseconds
+//   auto now = std::chrono::system_clock::now();
+//   auto now_as_time_t = std::chrono::system_clock::to_time_t(now);
+//   std::stringstream ss;
+//   ss << std::put_time(std::localtime(&now_as_time_t), "%Y-%m-%d %H:%M:%S");
 //
-//  // add milliseconds to string
-//  // auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-//  //                  now.time_since_epoch()) %
-//  //              1000;
-//  //ss << '.' << std::setfill('0') << std::setw(3) << now_ms.count();
+//   // add milliseconds to string
+//   // auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+//   //                  now.time_since_epoch()) %
+//   //              1000;
+//   //ss << '.' << std::setfill('0') << std::setw(3) << now_ms.count();
 //
-//  std::string timeStr = ss.str();
+//   std::string timeStr = ss.str();
 //
-//  // Create a dataspace for the attribute (scalar, since it's a single value)
-//  H5::DataSpace attr_dataspace = H5::DataSpace(H5S_SCALAR);
+//   // Create a dataspace for the attribute (scalar, since it's a single value)
+//   H5::DataSpace attr_dataspace = H5::DataSpace(H5S_SCALAR);
 //
-//  // Write the actual scan rate
-//  H5::Attribute scan_rate_attr = file.createAttribute(
-//      "actual_scan_rate", H5::PredType::NATIVE_DOUBLE, attr_dataspace);
-//  scan_rate_attr.write(H5::PredType::NATIVE_DOUBLE, &actual_scan_rate);
+//   // Write the actual scan rate
+//   H5::Attribute scan_rate_attr = file.createAttribute(
+//       "actual_scan_rate", H5::PredType::NATIVE_DOUBLE, attr_dataspace);
+//   scan_rate_attr.write(H5::PredType::NATIVE_DOUBLE, &actual_scan_rate);
 //
-//  // Write the current time
-//  H5::StrType str_type(H5::PredType::C_S1,
-//                       H5T_VARIABLE);  // Variable length string type
-//  H5::Attribute time_attr =
-//      file.createAttribute("current_time", str_type, attr_dataspace);
-//  time_attr.write(str_type, timeStr);
-//}
+//   // Write the current time
+//   H5::StrType str_type(H5::PredType::C_S1,
+//                        H5T_VARIABLE);  // Variable length string type
+//   H5::Attribute time_attr =
+//       file.createAttribute("current_time", str_type, attr_dataspace);
+//   time_attr.write(str_type, timeStr);
+// }
 void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
     HighFive::File& file, double actual_scan_rate) {
   std::string timeStr = fmt::format(
@@ -186,24 +190,24 @@ void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
   root.createAttribute("current_time", timeStr);
 }
 
-//template <typename T>
-//void LabJackU3Controller::SignalDataStorer::writeDataToDataSet(
-//    H5::DataSet& dataset, int columns, int rows, const H5::DataType& mem_type,
-//    const T* data) {
-//  // Get the new dimensions of the dataset
-//  hsize_t dims[2];
-//  dataset.getSpace().getSimpleExtentDims(dims, nullptr);
-//  hsize_t offset[2] = {dims[0] - rows, 0};
-//  hsize_t count[2] = {rows, columns};
+// template <typename T>
+// void LabJackU3Controller::SignalDataStorer::writeDataToDataSet(
+//     H5::DataSet& dataset, int columns, int rows, const H5::DataType&
+//     mem_type, const T* data) {
+//   // Get the new dimensions of the dataset
+//   hsize_t dims[2];
+//   dataset.getSpace().getSimpleExtentDims(dims, nullptr);
+//   hsize_t offset[2] = {dims[0] - rows, 0};
+//   hsize_t count[2] = {rows, columns};
 //
-//  // Create file and memory dataspace
-//  H5::DataSpace fspace = dataset.getSpace();
-//  fspace.selectHyperslab(H5S_SELECT_SET, count, offset);
-//  H5::DataSpace mspace(2, count);
+//   // Create file and memory dataspace
+//   H5::DataSpace fspace = dataset.getSpace();
+//   fspace.selectHyperslab(H5S_SELECT_SET, count, offset);
+//   H5::DataSpace mspace(2, count);
 //
-//  // Write the data to the dataset
-//  dataset.write(data, mem_type, mspace, fspace);
-//}
+//   // Write the data to the dataset
+//   dataset.write(data, mem_type, mspace, fspace);
+// }
 
 void LabJackU3Controller::SignalDataStorer::ProcessData() {
   SaveDataToH5File();
@@ -212,6 +216,9 @@ void LabJackU3Controller::SignalDataStorer::ProcessData() {
 
 void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
   // LOG_DEBUG("[Consumer Process]First elem: {}",loaded_data_->ain_votage[0]);
+  if (!vec_errors_.empty()) {
+    return;
+  }
   const auto& data = *loaded_data_;
   try {
     QString filename =
@@ -225,46 +232,157 @@ void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
                                              HighFive::File::Create);
       HighFive::File& file = file_safe.get();
       writeMetadataToH5File(file, actual_scan_rate_);
-      xt::dump(file, "ain_voltage", data.vec_ain_data);
-      xt::dump(file, "dout_states", data.vec_dout_data);
-      xt::dump(file, "din_states", data.vec_din_data);
-      xt::dump(file, "counter", data.vec_counter_data);
+      xt::dump(file, "/0_raw_data/ain_voltage", data.vec_ain_data);
+      xt::dump(file, "/0_raw_data/dout_states", data.vec_dout_data);
+      xt::dump(file, "/0_raw_data/din_states", data.vec_din_data);
+      xt::dump(file, "/0_raw_data/counter", data.vec_counter_data);
+
+      auto simplified_data = SimplifyStreamDataPackAndSaveToExistH5(
+          file, data, SimplifyMode::kCounter);
+      auto dout_high_range = GetDOutHighRange(data);
+      for (int i = 0; i < dout_high_range.size(); ++i) {
+        for (int j = 0; j < dout_high_range.at(i).size(); ++j) {
+          xt::dump(file, fmt::format("/1_simplified_data/dout_high_range_in_counter_number/counter_{}/dout_{}", i, j),
+                   dout_high_range.at(i).at(j));
+        }
+      }
+      //SimplifyStreamDataPackAndSaveToExistH5(file, data, SimplifyMode::kDOut);
     }
 
     cpptoolkit::rename_temp_file(temp_path, file_path);
-  } catch (std::runtime_error& e) {
+  } catch (std::exception& e) {
     LOG_ERROR("Error when SaveDataToH5File: {}", e.what());
     vec_errors_.push_back("Error when SaveDataToH5File");
   }
 }
 
-//void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
-//  // LOG_DEBUG("[Consumer Process]First elem: {}", loaded_data_->ain_votage[0]);
-//  const auto& data = *loaded_data_;
-//  // Increase dataset size for each data type
-//  dims_[0] += data.pack_size;
-//  //file_.reOpen();
-//  extendDataSet(dataset_ain_voltage_, kNumAIn, dims_[0]);
-//  extendDataSet(dataset_dout_states_, kNumDOut, dims_[0]);
-//  extendDataSet(dataset_din_states_, kNumDIn, dims_[0]);
-//  extendDataSet(dataset_counter_, kNumCounter, dims_[0]);
-//  LOG_DEBUG("data.pack_size:{}", data.pack_size);
-//  LOG_DEBUG("dims_[0]:{}", dims_[0]);
-//  // Write new data for each data type
-//  writeDataToDataSet(dataset_ain_voltage_, kNumAIn, data.pack_size,
-//                     H5::PredType::NATIVE_DOUBLE, data.vec_ain_data.data());
-//  writeDataToDataSet(dataset_dout_states_, kNumDOut, data.pack_size,
-//                     H5::PredType::NATIVE_HBOOL, data.vec_dout_data.data());
-//  writeDataToDataSet(dataset_din_states_, kNumDIn, data.pack_size,
-//                     H5::PredType::NATIVE_HBOOL, data.vec_din_data.data());
-//  writeDataToDataSet(dataset_counter_, kNumCounter, data.pack_size,
-//                     H5::PredType::NATIVE_UINT32, data.vec_counter_data.data());
-//  //file_.close();
-//}
-
+// void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
+//   // LOG_DEBUG("[Consumer Process]First elem: {}",
+//   loaded_data_->ain_votage[0]); const auto& data = *loaded_data_;
+//   // Increase dataset size for each data type
+//   dims_[0] += data.pack_size;
+//   //file_.reOpen();
+//   extendDataSet(dataset_ain_voltage_, kNumAIn, dims_[0]);
+//   extendDataSet(dataset_dout_states_, kNumDOut, dims_[0]);
+//   extendDataSet(dataset_din_states_, kNumDIn, dims_[0]);
+//   extendDataSet(dataset_counter_, kNumCounter, dims_[0]);
+//   LOG_DEBUG("data.pack_size:{}", data.pack_size);
+//   LOG_DEBUG("dims_[0]:{}", dims_[0]);
+//   // Write new data for each data type
+//   writeDataToDataSet(dataset_ain_voltage_, kNumAIn, data.pack_size,
+//                      H5::PredType::NATIVE_DOUBLE, data.vec_ain_data.data());
+//   writeDataToDataSet(dataset_dout_states_, kNumDOut, data.pack_size,
+//                      H5::PredType::NATIVE_HBOOL, data.vec_dout_data.data());
+//   writeDataToDataSet(dataset_din_states_, kNumDIn, data.pack_size,
+//                      H5::PredType::NATIVE_HBOOL, data.vec_din_data.data());
+//   writeDataToDataSet(dataset_counter_, kNumCounter, data.pack_size,
+//                      H5::PredType::NATIVE_UINT32,
+//                      data.vec_counter_data.data());
+//   //file_.close();
+// }
 
 void LabJackU3Controller::SignalDataStorer::ClearDataBuffer() {
   queue_data_buffer_ = std::queue<std::unique_ptr<StreamDataPack>>();
+}
+
+QJsonObject LabJackU3Controller::ProtocolListToQJson(
+    const std::vector<Protocol>& vec_protocols) {
+  QJsonObject json;
+  QJsonArray protocolsArray;
+
+  for (const auto& protocol : vec_protocols) {
+    QJsonObject protocolJson;
+    protocolJson["repetitions"] = protocol.repetitions;
+    protocolJson["infinite_repetition"] = protocol.infinite_repetition;
+
+    QJsonArray operationsArray;
+    for (const auto& operation : protocol.operations) {
+      QJsonObject operationJson;
+      operationJson["duration_in_ms"] = operation.duration_in_ms;
+
+      QJsonArray eioStatesArray;
+      for (size_t i = 0; i < operation.eioStates.size(); ++i) {
+        eioStatesArray.append(operation.eioStates.test(i));
+      }
+      operationJson["eioStates"] = eioStatesArray;
+
+      operationsArray.append(operationJson);
+    }
+    protocolJson["operations"] = operationsArray;
+
+    protocolsArray.append(protocolJson);
+  }
+
+  json["protocols"] = protocolsArray;
+  return json;
+}
+
+std::vector<LabJackU3Controller::Protocol>
+LabJackU3Controller::QJsonToProtocolList(
+    const QJsonObject& json_protocols) {
+  std::vector<Protocol> vec_protocols;
+  if (!json_protocols.contains("protocols") ||
+      !json_protocols["protocols"].isArray()) {
+    LOG_ERROR("Invalid JSON format for protocols");
+    return vec_protocols;
+  }
+  QJsonArray protocolsArray = json_protocols["protocols"].toArray();
+  for (const auto& protocolValue : protocolsArray) {
+    if (!protocolValue.isObject()) {
+      LOG_ERROR("Invalid protocol format in JSON");
+      continue;
+    }
+    QJsonObject protocolJson = protocolValue.toObject();
+    Protocol protocol;
+    protocol.repetitions = protocolJson["repetitions"].toInt();
+    protocol.infinite_repetition = protocolJson["infinite_repetition"].toBool();
+
+    if (!protocolJson.contains("operations") ||
+        !protocolJson["operations"].isArray()) {
+      LOG_ERROR("Invalid operations format in JSON");
+      continue;
+    }
+    QJsonArray operationsArray = protocolJson["operations"].toArray();
+    for (const auto& operationValue : operationsArray) {
+      if (!operationValue.isObject()) {
+        LOG_ERROR("Invalid operation format in JSON");
+        continue;
+      }
+      QJsonObject operationJson = operationValue.toObject();
+      Operation operation;
+      operation.duration_in_ms = operationJson["duration_in_ms"].toInt();
+
+      if (!operationJson.contains("eioStates") ||
+          !operationJson["eioStates"].isArray()) {
+        LOG_ERROR("Invalid eioStates format in JSON");
+        continue;
+      }
+      QJsonArray eioStatesArray = operationJson["eioStates"].toArray();
+      for (int i = 0; i < eioStatesArray.size() && i < 8; ++i) {
+        operation.eioStates.set(i, eioStatesArray[i].toBool());
+      }
+      protocol.operations.push_back(operation);
+    }
+    vec_protocols.push_back(protocol);
+  }
+  return vec_protocols;
+}
+
+int64_t LabJackU3Controller::EstimateTimeCost(
+    const std::vector<Protocol>& vec_protocol) {
+  int64_t total_time = 0;
+  int64_t protocol_time = 0;
+  for (const auto& protocol : vec_protocol) {
+    if (protocol.infinite_repetition == true) {
+      return -1;
+    }
+    protocol_time = 0;
+    for (const auto& operation : protocol.operations) {
+      protocol_time += operation.duration_in_ms;
+    }
+    total_time += protocol_time * protocol.repetitions;
+  }
+  return total_time;
 }
 
 std::vector<DeviceInfo> LabJackU3Controller::FindAllDevices() {
@@ -303,6 +421,179 @@ std::vector<DeviceInfo> LabJackU3Controller::FindAllDevices() {
     result.emplace_back(device_info);
   }
   return result;
+}
+
+LabJackU3Controller::BoundariesMask LabJackU3Controller::GetBoundariesMask(
+    const xt::xtensor<uint32_t, 2>& counter_data) {
+  auto shape = counter_data.shape();
+  xt::xtensor<bool, 2> start_mask(shape,false);
+  xt::xtensor<bool, 2> end_mask(shape, false);
+  size_t num_rows = shape[0];
+  size_t num_cols = shape[1];
+
+  // The first row is always a start point
+  xt::view(start_mask , 0, xt::all()) = true;
+  // The last row is always an end point
+  xt::view(end_mask, -1, xt::all()) = true;
+
+  using namespace xt::placeholders;
+  auto pre_view = xt::view(counter_data,xt::range(_,-1) ,xt::all());
+  auto post_view = xt::view(counter_data, xt::range(1, _), xt::all());
+  xt::view(end_mask, xt::range(_, -1), xt::all()) = xt::not_equal(pre_view,post_view);
+  xt::view(start_mask, xt::range(1, _), xt::all()) = xt::not_equal(pre_view,post_view);
+
+  return {start_mask, end_mask};
+}
+
+LabJackU3Controller::ChannelBoundaryData
+LabJackU3Controller::MaskStreamDataPack(const StreamDataPack& data_pack,
+                                        const BoundariesMask& bound_mask,
+                                        int64_t channel) {
+  auto start_mask =bound_mask.start_mask(channel);
+  auto end_mask = bound_mask.end_mask(channel);
+  auto start_indices = xt::keep(xt::where(start_mask)[0]);
+  auto end_indices = xt::keep(xt::where(end_mask)[0]);
+  //LOG_TRACE("Start indices: {}", start_indices);
+
+  ChannelBoundaryDataOneSide data_at_start;
+  ChannelBoundaryDataOneSide data_at_end;
+  data_at_start.ain_data =
+      xt::view(data_pack.vec_ain_data, start_indices, xt::all());
+  data_at_start.dout_data =
+      xt::view(data_pack.vec_dout_data, start_indices, xt::all());
+  data_at_start.din_data =
+      xt::view(data_pack.vec_din_data, start_indices, xt::all());
+  data_at_start.counter_data =
+      xt::view(data_pack.vec_counter_data, start_indices, xt::all());
+  data_at_end.ain_data =
+      xt::view(data_pack.vec_ain_data, end_indices, xt::all());
+  data_at_end.dout_data =
+      xt::view(data_pack.vec_dout_data, end_indices, xt::all());
+  data_at_end.din_data =
+      xt::view(data_pack.vec_din_data, end_indices, xt::all());
+  data_at_end.counter_data =
+      xt::view(data_pack.vec_counter_data, end_indices, xt::all());
+  return {data_at_start, data_at_end};
+}
+
+LabJackU3Controller::SimplifiedDataPack
+LabJackU3Controller::SimplifyStreamDataPack(const StreamDataPack& data_pack,
+                                            SimplifyMode mode) {
+  BoundariesMask bound_mask = GetBoundariesMask(data_pack.vec_counter_data);
+
+  switch (mode) {
+    case SimplifyMode::kCounter:
+      bound_mask = GetBoundariesMask(data_pack.vec_counter_data);
+      break;
+    case SimplifyMode::kDOut:
+      bound_mask = GetBoundariesMask(xt::cast<uint32_t>(data_pack.vec_dout_data));
+      break;
+  }
+  
+  std::vector<ChannelBoundaryData> vec_data_pack(bound_mask.channel_num());
+  for (size_t i = 0; i < bound_mask.channel_num(); ++i) {
+    vec_data_pack.at(i) = MaskStreamDataPack(data_pack, bound_mask, i);
+  }
+  return {vec_data_pack, bound_mask};
+}
+
+LabJackU3Controller::SimplifiedDataPack
+LabJackU3Controller::SimplifyStreamDataPackAndSaveToExistH5(
+    HighFive::File& file, const StreamDataPack& data_pack, SimplifyMode mode) {
+  SimplifiedDataPack simplified_data = SimplifyStreamDataPack(data_pack, mode);
+  std::string mode_name;
+  switch (mode) {
+    case SimplifyMode::kCounter:
+      mode_name = "counter";
+      break;
+    case SimplifyMode::kDOut:
+      mode_name = "dout";
+      break;
+  }
+  for (size_t i = 0; i < simplified_data.channel_num(); ++i) {
+    const auto& channel_data = simplified_data.vec_data_pack.at(i);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/start/ain_data/", mode_name, i),
+             channel_data.data_at_start.ain_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/start/dout_data/", mode_name, i),
+             channel_data.data_at_start.dout_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/start/din_data/", mode_name, i),
+             channel_data.data_at_start.din_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/start/counter_data/", mode_name, i),
+             channel_data.data_at_start.counter_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/end/ain_data/", mode_name, i),
+             channel_data.data_at_end.ain_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/end/dout_data/", mode_name, i),
+             channel_data.data_at_end.dout_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/end/din_data/", mode_name, i),
+             channel_data.data_at_end.din_data);
+    xt::dump(file, fmt::format("/1_simplified_data/{}/{}/end/counter_data/", mode_name, i),
+             channel_data.data_at_end.counter_data);
+  }
+  xt::xtensor<int, 2> start_mask =
+      xt::cast<int>(simplified_data.boundaries_mask.start_mask_);
+  xt::xtensor<int, 2> end_mask =
+      xt::cast<int>(simplified_data.boundaries_mask.start_mask_);
+  xt::dump(file, fmt::format("/1_simplified_data/{}/start_mask",mode_name), start_mask);
+  xt::dump(file, fmt::format("/1_simplified_data/{}/end_mask", mode_name), end_mask);
+  return simplified_data;
+}
+
+LabJackU3Controller::DOutHighRange LabJackU3Controller::GetDOutHighRange(
+    const StreamDataPack& data_pack) {
+  size_t counter_channel_num = data_pack.vec_counter_data.shape()[1];
+  size_t dout_channel_num = data_pack.vec_dout_data.shape()[1];
+  DOutHighRange dout_high_range_in_counter(counter_channel_num,
+                                           VecRangeList(dout_channel_num));
+  xt::xtensor<bool, 2> dout_high_mask = xt::cast<bool>(data_pack.vec_dout_data);
+  
+  using size_type = xt::xtensor<bool, 2>::size_type;
+  using Indices=std::vector<size_type>;
+  std::vector<Indices> vec_dout_high_indices;
+
+  for (size_t i = 0; i < dout_channel_num; ++i) {
+    auto mask = xt::view(dout_high_mask, xt::all(), i);
+    vec_dout_high_indices.push_back(xt::where(mask)[0]);
+  }
+
+
+  for (int i = 0; i < counter_channel_num; ++i) {
+    for (int j = 0; j < dout_channel_num; ++j) {
+      if (vec_dout_high_indices.at(j).empty()) {
+        dout_high_range_in_counter.at(i).at(j) = xt::xtensor<uint32_t, 2>();
+        continue;
+      }
+
+      const auto counter_data = xt::view(
+          data_pack.vec_counter_data, xt::keep(vec_dout_high_indices.at(j)), i);
+      std::vector<uint32_t> unique;
+      unique.push_back(counter_data(0));
+      for (size_t k = 1; k < counter_data.size(); ++k) {
+        if (counter_data(k) != counter_data(k - 1)) {
+          unique.push_back(counter_data(k));
+        }
+      }
+
+      std::vector<uint32_t> edge;
+      edge.push_back(unique.front());
+      for (size_t k = 1; k < unique.size(); ++k) {
+        if (unique.at(k) - unique.at(k - 1) != 1) {
+          edge.push_back(unique.at(k-1));
+          edge.push_back(unique.at(k));
+        }
+      }
+      edge.push_back(unique.back());
+
+      xt::xtensor<uint32_t, 2> range_tensor({edge.size() / 2 , 2});
+      uint32_t last_num = edge.back();
+      range_tensor.fill(last_num);
+      for (size_t k = 0; k < edge.size(); ++k) {
+        range_tensor.at(k / 2, k % 2) = edge.at(k);
+      }
+      dout_high_range_in_counter.at(i).at(j) = range_tensor;
+    }
+  }
+
+  return dout_high_range_in_counter;
 }
 
 void LabJackU3Controller::OpenDevice() {
@@ -508,12 +799,14 @@ LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
   return data;
 }
 
-void LabJackU3Controller::CollectSignalData() {
+void LabJackU3Controller::CollectSignalData(const QString& store_path) {
   // SignalData current_data;
+  clear_errors_collect_();
   StreamDataPack current_data_pack;
-  SignalDataStorer storer(
-      QString::fromStdString(store_dir_ + cpptoolkit::DateTime().date_time() +
-                             "_" + store_name_ + store_format_));
+  //SignalDataStorer storer(
+  //    QString::fromStdString(store_dir_ + cpptoolkit::DateTime().date_time() +
+  //                           "_" + store_name_ + store_format_));
+  SignalDataStorer storer(store_path);
   // LOG_INFO(full_path.string());
   flag_collect_data_ = true;
   // Stream Mode
@@ -539,22 +832,36 @@ void LabJackU3Controller::CollectSignalData() {
       if (flag_store_data_) {
         storer.StoreSignalDataAsync(current_data_pack);
       }
+      if (operation_unit_in_s_ > 0.1) {
+        // Sleep for the duration of the operation unit
+        std::this_thread::sleep_for(std::chrono::milliseconds(
+            static_cast<int>(operation_unit_in_s_ * 1000 - 50)));
+      }
     }
   } catch (std::exception& e) {
     std::string error_msg =
         fmt::format("Error occured when collecting signal.\n> {}", e.what());
     LOG_ERROR(error_msg);
-    vec_errors_.push_back(error_msg);
+    vec_errors_collect_.push_back(error_msg);
   }
   catch (...) {
     std::string error_msg =
         fmt::format("Unknown exception caught. Signal Collection End.");
     LOG_ERROR(error_msg);
-    vec_errors_.push_back(error_msg);
+    vec_errors_collect_.push_back(error_msg);
   }
   StopGetStreamData();
   auto storer_errors = storer.GetErrors();
-  vec_errors_.insert(vec_errors_.end(), storer_errors.begin(), storer_errors.end());
+  vec_errors_collect_.insert(vec_errors_collect_.end(), storer_errors.begin(), storer_errors.end());
+
+  if (!vec_errors_collect_.empty()) {
+    QStringList qtData;
+
+    for (const auto& str : vec_errors_collect_) {
+      qtData << QString::fromStdString(str);
+    }
+    emit errorCollect(qtData);
+  }
   //ptr_ui_->CollectSignalDataEnded();
 }
 
@@ -697,7 +1004,7 @@ LabJackU3Controller::StreamDataPack LabJackU3Controller::GetStreamDataPack() {
   // Read data until done.
   // Must set the number of scans to read each iteration, as the read
   // returns the actual number read.
-  double actual_number_read = 5000;
+  double actual_number_read = 5000 * operation_unit_in_s_;
   double dblCommBacklog = -1;
   double dblUDBacklog = -1;
   std::vector<double> raw_data(actual_number_read * number_of_channels_, -1);
@@ -827,12 +1134,13 @@ LabJackU3Controller::StreamDataPack LabJackU3Controller::GetStreamDataPack() {
   return data_pack;
 }
 
-void LabJackU3Controller::CollectSignalDataAsync() {
+void LabJackU3Controller::CollectSignalDataAsync(const QString& store_path) {
   if (th_data_.joinable()) {
     LOG_WARN("The device is currently collecting signal data.");
     return;
   }
-  th_data_ = std::thread(&LabJackU3Controller::CollectSignalData, this);
+  th_data_ =
+      std::thread(&LabJackU3Controller::CollectSignalData, this, store_path);
 }
 
 void LabJackU3Controller::SetUpCounters() {  // Set Up Counters

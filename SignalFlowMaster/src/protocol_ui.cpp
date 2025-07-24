@@ -10,7 +10,16 @@ ProtocolUI::ProtocolUI(QWidget* parent)
 
 ProtocolUI::~ProtocolUI() { delete ui; }
 
-void ProtocolUI::PutProtocol(const Protocol& protocol) {}
+void ProtocolUI::PutProtocol(const Protocol& protocol) {
+  ui->checkBox_infinite->setChecked(protocol.infinite_repetition);
+  ui->spinBox_repetitions->setValue(protocol.repetitions);
+  DeleteAllOperation();
+  for (const Operation& op : protocol.operations) {
+    AddOperation(op);
+    //LOG_TRACE("Adding operation with duration: {} ms", op.duration_in_ms);
+    //LOG_TRACE("Adding operation with EIO states: {}", op.eioStates);
+  }
+}
 
 ProtocolUI::Protocol ProtocolUI::GetProtocol() {
   using Operation = signal_flow_master::LabJackU3Controller::Operation;
@@ -56,7 +65,7 @@ ProtocolUI::Protocol ProtocolUI::GetProtocol() {
 
 void ProtocolUI::on_pushButton_add_clicked() { AddOperation(); }
 
-void ProtocolUI::AddOperation() {
+void ProtocolUI::AddOperation(const Operation& operation) {
   QFrame* frame = ui->frame_operations;
   // Assuming frame's layout is already a QGridLayout
   QGridLayout* layout = qobject_cast<QGridLayout*>(frame->layout());
@@ -69,6 +78,7 @@ void ProtocolUI::AddOperation() {
 
   // Create your custom QWidget (OperationUI) and QPushButton
   OperationUI* operation_ui = new OperationUI();
+  operation_ui->PutOperation(operation);
   QPushButton* btn = new QPushButton("Delete");
 
   // Get the next available row in the layout
@@ -81,6 +91,24 @@ void ProtocolUI::AddOperation() {
   // Connect the button to DeleteOperation
   // Assuming 'this' is the object where DeleteOperation is defined
   connect(btn, &QPushButton::clicked, [=]() { DeleteOperation(row); });
+}
+
+void ProtocolUI::AddOperation() {
+  Operation op;
+  AddOperation(op);
+}
+
+void ProtocolUI::DeleteAllOperation() {
+  QFrame* frame = ui->frame_operations;
+  QGridLayout* layout = qobject_cast<QGridLayout*>(frame->layout());
+  if (!layout) return;
+  // Clear all items in the layout
+  while (QLayoutItem* item = layout->takeAt(0)) {
+    if (item->widget()) {
+      delete item->widget();
+    }
+    delete item;
+  }
 }
 
 void ProtocolUI::DeleteOperation(int row) {

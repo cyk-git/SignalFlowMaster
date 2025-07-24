@@ -16,6 +16,8 @@
 #include <CppToolkit\hdf5_toolkit_core.h>
 //#include <H5Cpp.h>
 #include <LabJackUD.h>
+#include <xtensor\xview.hpp>
+
 
 #include <array>
 #include <bitset>
@@ -28,6 +30,9 @@
 #include <thread>
 #include <vector>
 #include <QString>
+#include <QObject>
+#include <QJsonArray>
+#include <QJsonObject>
 
 //#include "labjack_u3_ctrl_ui_interface.h"
 
@@ -40,8 +45,15 @@ struct DeviceInfo {
   std::map<std::string, std::string> infos;
 };
 
-class LabJackU3Controller {
- public:                             // Define Structs
+class LabJackU3Controller:public QObject {
+  
+  Q_OBJECT
+
+ public:
+ signals:
+  void errorCollect(QStringList vec_errors_collect);
+
+ public: 
   static const size_t kNumAIn = 4;      // AIO 0-3
   static const size_t kNumDOut = 8;  // EIO 0-7
   static const size_t kNumDIn = 4;      // CIO 0-3
@@ -72,6 +84,7 @@ class LabJackU3Controller {
   //      std::vector<uint32_t>(kNumCounter * pack_size);
   //  explicit StreamDataPack(int _pack_size = 0) : pack_size(_pack_size) {}
   //};
+
   struct StreamDataPack {
     size_t pack_size;
     xt::xtensor<double, 2> vec_ain_data;
@@ -224,8 +237,8 @@ class LabJackU3Controller {
   }
 
   SignalData CollectOneSignalData();
-  void CollectSignalData();
-  void CollectSignalDataAsync();
+  void CollectSignalData(const QString& store_path);
+  void CollectSignalDataAsync(const QString& store_path);
   void set_store_data(bool store) { flag_store_data_ = store; }
   void set_display_data(bool display) { flag_display_data_ = display; }
   void StopCollectData() {
@@ -236,15 +249,15 @@ class LabJackU3Controller {
       }
     }
   }
-  void set_store_path(std::string store_dir, std::string store_name,
-                      std::string store_format) {
-    store_dir_ = store_dir;
-    store_name_ = store_name;
-    store_format_ = store_format;
-  }
-  std::string get_store_path() {
-    return store_dir_ + store_name_ + store_format_;
-  }
+  //void set_store_path(std::string store_dir, std::string store_name,
+  //                    std::string store_format) {
+  //  store_dir_ = store_dir;
+  //  store_name_ = store_name;
+  //  store_format_ = store_format;
+  //}
+  //std::string get_store_path() {
+  //  return store_dir_ + store_name_ + store_format_;
+  //}
 
   void SetUpAIns();
   void SetUpDINs();
@@ -258,11 +271,73 @@ class LabJackU3Controller {
   void StartGetStreamData();
   void StopGetStreamData();
   StreamDataPack GetStreamDataPack();
+  double get_operation_unit_in_s() { return operation_unit_in_s_; }
+  void set_operation_unit_in_s(double operation_unit_in_s) {
+    operation_unit_in_s_ = operation_unit_in_s;
+  }
 
-  std::vector<std::string> get_errors() const { return vec_errors_; }
-  void clear_errors() { vec_errors_.clear(); }
+  std::vector<std::string> get_errors_collect_() const { return vec_errors_collect_; }
+  void clear_errors_collect_() { vec_errors_collect_.clear(); }
+
+  static QJsonObject ProtocolListToQJson(const std::vector<Protocol>& vec_protocols);
+  static std::vector<Protocol> QJsonToProtocolList(const QJsonObject& json_protocols);
+
+  // Return the estimated time in ms cost for vec_protocol
+  // Return -1 if have infinite repetition protocol
+  static int64_t EstimateTimeCost(const std::vector<Protocol>& vec_protocol);
 
   static std::vector<DeviceInfo> FindAllDevices();
+
+  struct BoundariesMask {
+    xt::xtensor<bool, 2> start_mask_;
+    xt::xtensor<bool, 2> end_mask_;
+    auto start_mask(size_t channel) const {
+      return xt::view(start_mask_, xt::all(), channel);
+    }
+    auto end_mask(size_t channel) const {
+      return xt::view(end_mask_, xt::all(), channel);
+    }
+    size_t channel_num() const { return start_mask_.shape()[1]; }
+  };
+
+  struct ChannelBoundaryDataOneSide {
+    xt::xtensor<double, 2> ain_data;
+    xt::xtensor<int_bool, 2> dout_data;
+    xt::xtensor<int_bool, 2> din_data;
+    xt::xtensor<uint32_t, 2> counter_data;
+  };
+  struct ChannelBoundaryData {
+    ChannelBoundaryDataOneSide data_at_start;
+    ChannelBoundaryDataOneSide data_at_end;
+  };
+  struct SimplifiedDataPack {
+    std::vector<ChannelBoundaryData> vec_data_pack;
+    BoundariesMask boundaries_mask;
+    size_t channel_num() const { return boundaries_mask.channel_num(); } 
+  };
+ 
+  using RangeList = xt::xtensor<uint32_t, 2>;
+  using VecRangeList = std::vector<RangeList>;
+  using DOutHighRange = std::vector<VecRangeList>;
+
+  enum class SimplifyMode {
+    kCounter,  // Simplify by counter data
+    //kAIn,      // Simplify by AIn data
+    kDOut,     // Simplify by DOut data
+    //kDIn       // Simplify by DIn data
+  };
+  static BoundariesMask GetBoundariesMask(
+      const xt::xtensor<uint32_t, 2>& counter_data);
+  static ChannelBoundaryData MaskStreamDataPack(
+      const StreamDataPack& data_pack, const BoundariesMask& bound_mask,
+      int64_t channel);
+  static SimplifiedDataPack SimplifyStreamDataPack(
+      const StreamDataPack& data_pack, SimplifyMode mode = SimplifyMode::kCounter);
+  static SimplifiedDataPack SimplifyStreamDataPackAndSaveToExistH5(
+      HighFive::File& file, const StreamDataPack& data_pack,
+      SimplifyMode mode = SimplifyMode::kCounter);
+  static DOutHighRange GetDOutHighRange(const StreamDataPack& data_pack);
+
 
  private:
   //LabJackU3CtrlUIInterface* ptr_ui_;
@@ -285,6 +360,7 @@ class LabJackU3Controller {
   int cio_channel_id = -1;                                              // 5
   std::vector<int> vec_counter_channel_id =
       std::vector<int>(kNumCounter, -1);  // 6,8
+  double operation_unit_in_s_ = 1.0;
 
   // Protocol
   bool flag_execute_protocol_ = false;
@@ -301,12 +377,14 @@ class LabJackU3Controller {
   bool flag_store_data_ = false;
   bool flag_display_data_ = false;
   std::thread th_data_;
-  std::string store_dir_ = "C:/Experiment/";
-  std::string store_name_ = "exp";
-  std::string store_format_ = ".h5";
+  //std::string store_dir_ = "C:/Experiment/";
+  //std::string store_name_ = "exp";
+  //std::string store_format_ = ".h5";
+  //QString store_root_dir_ = "C:/Experiment/LabjackU3/";
+  //QString store_folder_name_ = "exp";
 
   // Collect Errors
-  std::vector<std::string> vec_errors_;
+  std::vector<std::string> vec_errors_collect_;
 };
 }  // namespace signal_flow_master
 

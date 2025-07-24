@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>326</width>
-    <height>576</height>
+    <height>615</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Browse Devices</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,1">
@@ -100,7 +100,7 @@
      <x>0</x>
      <y>0</y>
      <width>326</width>
-     <height>23</height>
+     <height>25</height>
     </rect>
    </property>
   </widget>
@@ -116,7 +116,7 @@
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
-  <include location="../res/mainwindow.qrc"/>
+  <include location="../res/image.qrc"/>
  </resources>
  <connections/>
 </ui>

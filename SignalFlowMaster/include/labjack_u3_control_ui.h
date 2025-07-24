@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QtWidgets/QMainWindow>
+#include <QTimer>
+#include <QElapsedTimer>
 #include <memory>
 
 #include "labjack_u3_controller.h"
@@ -19,6 +21,10 @@ class LabJackU3ControlUI : public QMainWindow
   Q_OBJECT
 
  public:
+ signals:
+  void closeBrowseDeviceUI();
+
+ public:
   using Protocol = signal_flow_master::LabJackU3Controller::Protocol;
   LabJackU3ControlUI(const std::string &address, BrowseDeviceUI *parent = nullptr);
   ~LabJackU3ControlUI();
@@ -35,24 +41,37 @@ class LabJackU3ControlUI : public QMainWindow
   void StartCollectSignal();
   void StopCollectSignal();
 
-  void AddProtocol();
+
   Protocol GetProtocol(int row);
   std::vector<Protocol> GetAllProtocol();
   void RunProtocolListAsync(const std::vector<Protocol>& vec_protocol);
   bool MoveBottomProtocolUp(int row);
   bool MoveTopProtocolDown(int row);
+  void DeleteAllProtocol();
+  void AddProtocol(const Protocol &protocol);
+  void AddProtocolsFromFile(bool clear_before_add);
 
-
- private slots:
-  void on_pushButton_storePath_clicked();
-  void on_pushButton_collect_clicked();
-  void on_pushButton_reset_clicked();
-  void on_pushButton_add_clicked();
-  void on_pushButton_runAll_clicked();
+ protected:
+  void closeEvent(QCloseEvent *event) override;
+ 
+private slots:
+  void BrowseSaveRootPath();
+  void ClickCollect();
+  //void on_actionReset_Frame_Counter_clicked();
+  //void on_pushButton_add_clicked();
+  void ResetCounter();
+  void AddEmptyProtocol();
+  void ClickRunAll();
   void DeleteProtocol(int row);
   void Run(int row);
   void MoveProtocolUp(int row);
   void MoveProtocolDown(int row);
+  void ShowErrors(QStringList errors);
+  void SaveProtocolList();
+  void LoadProtocolList();
+  void AddProtocolList();
+  void UpdateRunProgress();
+  void SetOpUnit(double unit);
 
  private:
   BrowseDeviceUI *ptr_mainwindow;
@@ -60,5 +79,14 @@ class LabJackU3ControlUI : public QMainWindow
   std::string kAddress_;
   signal_flow_master::LabJackU3Controller controller_;
   bool isCollecting_ = false;
-  
+
+  QString default_preset_path_ = "./preset/";
+
+  QTimer run_protocol_timer_;
+  int64_t run_protocol_time_cost_est_;
+  QElapsedTimer elapsedTimer;
+  QString formatTime(int64_t ms);
+  void FinishProgressBarRun();
+
+  void setupConnections();
 };

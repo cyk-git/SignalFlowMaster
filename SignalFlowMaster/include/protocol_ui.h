@@ -17,13 +17,16 @@ class ProtocolUI : public QWidget {
 
  public:
   using Protocol = signal_flow_master::LabJackU3Controller::Protocol;
+  using Operation = signal_flow_master::LabJackU3Controller::Operation;
   ProtocolUI(QWidget *parent = nullptr);
   ~ProtocolUI();
 
   void PutProtocol(const Protocol &protocol);
   Protocol GetProtocol();
 
+  void AddOperation(const Operation &operation);
   void AddOperation();
+  void DeleteAllOperation();
 
  private slots:
   void on_pushButton_add_clicked();

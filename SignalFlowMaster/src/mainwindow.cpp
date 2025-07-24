@@ -72,6 +72,8 @@ void BrowseDeviceUI::OpenDevice(const std::string& address) {
   labjack_ui->setAttribute(Qt::WA_DeleteOnClose, true);
   labjack_ui->OpenDevice();
   opened_addresses_.push_back(address);
+  connect(labjack_ui, &LabJackU3ControlUI::closeBrowseDeviceUI, this,
+          &BrowseDeviceUI::close);
 }
 
 void BrowseDeviceUI::DeviceClosed(const std::string& address) {

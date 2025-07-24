@@ -84,11 +84,11 @@
     <QtMoc Include="..\..\include\protocol_ui.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="..\..\include\labjack_u3_controller.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\labjack_u3_controller.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\res\resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
