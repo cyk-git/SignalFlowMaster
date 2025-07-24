@@ -60,6 +60,7 @@
     <Import Project="..\..\props\StdProjectDir.props" />
     <Import Project="..\..\props\HDF5.props" />
     <Import Project="..\..\props\LabJack.props" />
+    <Import Project="..\..\3rdPartyLibs\CppToolkit\h5_use_xtensor.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
