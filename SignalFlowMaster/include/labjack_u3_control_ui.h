@@ -50,12 +50,16 @@ class LabJackU3ControlUI : public QMainWindow
   bool MoveTopProtocolDown(int row);
   void DeleteAllProtocol();
   void AddProtocol(const Protocol &protocol);
-  void AddProtocolsFromFile(bool clear_before_add);
+  void AddProtocolsFromFile(QString file_path, bool clear_before_add);
   //std::vector<ProtocolUI *> GetAllProtocolUI();
   //void SelectHighlightOperation(QUuid uuid, bool highlighted);
 
  protected:
   void closeEvent(QCloseEvent *event) override;
+
+  void dragEnterEvent(QDragEnterEvent *event) override;
+
+  void dropEvent(QDropEvent *event) override;
  
 private slots:
   void BrowseSaveRootPath();

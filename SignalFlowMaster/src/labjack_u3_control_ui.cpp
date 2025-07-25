@@ -5,6 +5,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QtConcurrent/QtConcurrent>
+#include <QDragEnterEvent>
 
 #include <CppToolkit\qjson_save_and_load.h>
 
@@ -146,9 +147,17 @@ void LabJackU3ControlUI::SaveProtocolList() {
       tr("Save Protocol List"), default_preset_path_);
 }
 
-void LabJackU3ControlUI::LoadProtocolList() { AddProtocolsFromFile(true); }
+void LabJackU3ControlUI::LoadProtocolList() {   
+   QString file_path = QFileDialog::getOpenFileName(
+       this, tr("Load Protocol List"), default_preset_path_);
+  AddProtocolsFromFile(file_path, true);
+}
 
-void LabJackU3ControlUI::AddProtocolList() { AddProtocolsFromFile(false); }
+void LabJackU3ControlUI::AddProtocolList() {
+  QString file_path = QFileDialog::getOpenFileName(
+      this, tr("Add Protocol List"), default_preset_path_);
+  AddProtocolsFromFile(file_path, false);
+}
 
 void LabJackU3ControlUI::UpdateRunProgress() {
   qint64 elapsed = elapsedTimer.elapsed();
@@ -349,9 +358,10 @@ void LabJackU3ControlUI::AddProtocol(const Protocol& protocol) {
           protocol_ui, &ProtocolUI::SelectDeHighlightOp);
 }
 
-void LabJackU3ControlUI::AddProtocolsFromFile(bool clear_before_add) {
-  QString file_path = QFileDialog::getOpenFileName(
-      this, tr("Load Protocol List"), default_preset_path_);
+void LabJackU3ControlUI::AddProtocolsFromFile(QString file_path,
+                                              bool clear_before_add) {
+  // QString file_path = QFileDialog::getOpenFileName(
+  //     this, tr("Load Protocol List"), default_preset_path_);
   if (!file_path.isEmpty()) {
     QJsonObject json = cpptoolkit::LoadQJsonObject(file_path);
     if (json.isEmpty()) {
@@ -409,6 +419,47 @@ void LabJackU3ControlUI::closeEvent(QCloseEvent* event) {
     emit closeBrowseDeviceUI();
   }
 }
+
+void LabJackU3ControlUI::dragEnterEvent(QDragEnterEvent* event) {
+  // Check if the dragged content contains files
+  if (event->mimeData()->hasUrls()) {
+    for (const QUrl& url : event->mimeData()->urls()) {
+      if (url.fileName().endsWith(".json")) {  // only accept json files
+        event->acceptProposedAction();
+        return;
+      }
+    }
+  } else {
+    event->ignore();
+  }
+}
+
+// Triggered when files are dropped onto the widget
+void LabJackU3ControlUI::dropEvent(QDropEvent* event) {
+  const QMimeData* mimeData = event->mimeData();
+
+  if (mimeData->hasUrls()) {
+    QList<QUrl> urlList = mimeData->urls();
+
+    // Iterate through all dropped files (supports multiple files)
+    for (const QUrl& url : urlList) {
+      QString filePath = url.toLocalFile();  // Get the local file path
+
+      // Optional: Check the file extension
+      if (!filePath.endsWith(".json")) {
+        //LOG_WARN("Unsupported file type:{}", filePath.toStdString());
+        QMessageBox::warning(
+            this, tr("Unsupported File Type"),
+            tr("Only .json files are supported for dropping. \n") +
+                tr("File path: ") + filePath);
+        continue;
+      }
+      AddProtocolsFromFile(filePath, false);
+    }
+    event->acceptProposedAction();
+  }
+}
+
 
 void LabJackU3ControlUI::ResetCounter() {
   controller_.ResetAllCounters();
