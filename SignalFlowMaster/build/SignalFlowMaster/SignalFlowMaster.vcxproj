@@ -58,7 +58,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="$(QtMsBuild)\Qt.props" />
     <Import Project="..\..\props\StdProjectDir.props" />
-    <Import Project="..\..\props\HDF5.props" />
     <Import Project="..\..\props\LabJack.props" />
     <Import Project="..\..\3rdPartyLibs\CppToolkit\h5_use_xtensor.props" />
     <Import Project="qt_deploy.props" />
