@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -231,8 +232,9 @@ class LabJackU3Controller:public QObject {
   // void ExecuteProtocolAsync(const Protocol& protocol);
   void ExecuteProtocolListAsync(const std::vector<Protocol>& vec_protocol);
   void InterruptProtocol() {
-    if (flag_execute_protocol_ == true) {
-      flag_execute_protocol_ = false;
+    {
+      std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+      ++protocol_interrupt_epoch_;  // Signal all running protocol executions to stop
     }
     // sleep_waiter.notify_all();
     sleep_waiter.wake_up();
@@ -286,6 +288,9 @@ class LabJackU3Controller:public QObject {
 
   static QJsonObject ProtocolListToQJson(const std::vector<Protocol>& vec_protocols);
   static std::vector<Protocol> QJsonToProtocolList(const QJsonObject& json_protocols);
+
+  void StartNetworkControlListener();
+  void StopNetworkControlListener();
 
   // Return the estimated time in ms cost for vec_protocol
   // Return -1 if have infinite repetition protocol
@@ -368,14 +373,22 @@ class LabJackU3Controller:public QObject {
   double operation_unit_in_s_ = 1.0;
 
   // Protocol
-  bool flag_execute_protocol_ = false;
+  int protocol_execution_depth_ = 0;   // Number of active protocol execution contexts
+  int protocol_interrupt_epoch_ = 0;   // Increment to interrupt all running protocol contexts
+  std::mutex mutex_protocol_execution_;  // Protects protocol execution state
   std::thread th_protocol_;
   // std::condition_variable sleep_waiter;
   cpptoolkit::SleepWaiter sleep_waiter;
   // std::array<bool, kNumDOut> eio_states_ = {0, 0, 0, 0, 0, 0, 0, 0};
+  std::mutex mutex_labjack_operation_;  // Protects LabJack command execution
 
-  void ExecuteOperation(const Operation& operation);
-  void ExecuteProtocol(const Protocol& protocol);
+  void ExecuteOperation(const Operation& operation, int run_epoch);
+  void ExecuteProtocol(const Protocol& protocol, int run_epoch);
+  void NetworkControlLoop();
+  static bool ParseProtocolCommandJson(const std::string& command_json,
+                                       std::vector<Protocol>* vec_protocols,
+                                       std::string* error_message);
+  static void AssignOperationUuids(std::vector<Protocol>* vec_protocols);
 
   // Collect Signal Data
   bool flag_collect_data_ = false;
@@ -390,6 +403,12 @@ class LabJackU3Controller:public QObject {
 
   // Collect Errors
   std::vector<std::string> vec_errors_collect_;
+
+  // Network Control
+  bool flag_network_listener_running_ = false;
+  std::thread th_network_listener_;
+  std::mutex mutex_network_listener_;
+  const int kNetworkControlPort_ = 33090;
 };
 }  // namespace signal_flow_master
 
