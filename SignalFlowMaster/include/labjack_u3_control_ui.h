@@ -93,9 +93,11 @@ private slots:
 
   QTimer run_protocol_timer_;
   int64_t run_protocol_time_cost_est_;
+  bool isProtocolRunning_ = false;
   QElapsedTimer elapsedTimer;
   QString formatTime(int64_t ms);
   void FinishProgressBarRun();
+  void SetProtocolsLocked(bool locked);
 
   void setupConnections();
 };

@@ -66,7 +66,7 @@ void LabJackU3ControlUI::ClickCollect() {
 //void LabJackU3ControlUI::on_pushButton_add_clicked() { AddEmptyProtocol(); }
 
 void LabJackU3ControlUI::ClickRunAll() {
-  if (ui->scrollArea_protocols->isEnabled()) {
+  if (!isProtocolRunning_) {
     RunProtocolListAsync(GetAllProtocol());
   } else {
     controller_.InterruptProtocol();  
@@ -229,6 +229,14 @@ QString LabJackU3ControlUI::formatTime(int64_t ms) {
 void LabJackU3ControlUI::FinishProgressBarRun() { 
   ui->progressBar_run->setMaximum(1);
   ui->progressBar_run->setValue(1);
+}
+
+void LabJackU3ControlUI::SetProtocolsLocked(bool locked) {
+  QWidget* container = ui->scrollArea_protocols->widget();
+  if (!container) {
+    return;
+  }
+  container->setEnabled(!locked);
 }
 
 bool LabJackU3ControlUI::MoveBottomProtocolUp(int row) {
@@ -588,8 +596,9 @@ std::vector<LabJackU3ControlUI::Protocol> LabJackU3ControlUI::GetAllProtocol() {
 
 void LabJackU3ControlUI::RunProtocolListAsync(
     const std::vector<Protocol>& vec_protocol) {
-  // Disable all run buttons
-  ui->scrollArea_protocols->setEnabled(false);
+  // Disable all protocol widgets while keeping scroll area scrollable
+  isProtocolRunning_ = true;
+  SetProtocolsLocked(true);
   ui->pushButton_runAll->setText(tr("Stop Protocol"));
   run_protocol_time_cost_est_ = controller_.EstimateTimeCost(vec_protocol);
   ui->progressBar_run->setValue(0);
@@ -603,10 +612,12 @@ void LabJackU3ControlUI::RunProtocolListAsync(
   // Enable buttons when finished
   auto watcher = new QFutureWatcher<void>(this);
   connect(watcher, &QFutureWatcher<void>::finished, [=]() {
+    isProtocolRunning_ = false;
     run_protocol_timer_.stop();
     FinishProgressBarRun();
-    ui->scrollArea_protocols->setEnabled(true);
+    SetProtocolsLocked(false);
     ui->pushButton_runAll->setText(tr("Run All"));
+    watcher->deleteLater();
   });
   watcher->setFuture(future);
 }
