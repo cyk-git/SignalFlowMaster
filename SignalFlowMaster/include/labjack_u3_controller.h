@@ -16,7 +16,7 @@
 #include <CppToolkit\hdf5_toolkit_core.h>
 //#include <H5Cpp.h>
 #include <LabJackUD.h>
-#include <xtensor\xview.hpp>
+#include <xtensor\views\xview.hpp>
 
 
 #include <array>

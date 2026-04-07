@@ -3,6 +3,7 @@
 #include <CppToolkit\date_time.h>
 #include <CppToolkit\qt_file_operations.h>
 #include <CppToolkit\qjson_save_and_load.h>
+#include <ctime>
 
 #include <algorithm>
 #include <bitset>
@@ -188,8 +189,11 @@ void LabJackU3Controller::SignalDataStorer::LoadDataForProcess() {
 // }
 void LabJackU3Controller::SignalDataStorer::writeMetadataToH5File(
     HighFive::File& file, double actual_scan_rate) {
+  auto now = std::chrono::system_clock::now(); // Get current time point
+  std::time_t t = std::chrono::system_clock::to_time_t(now); // Convert to time_t
+  auto tm = std::localtime(&t); // Use standard library's localtime
   std::string timeStr = fmt::format(
-      "{:%Y-%m-%d %H:%M:%S}", fmt::localtime(std::chrono::system_clock::now()));
+      "{:%Y-%m-%d %H:%M:%S}", *tm);
   HighFive::Group root = file.getGroup("/");
   root.createAttribute("actual_scan_rate", actual_scan_rate);
   root.createAttribute("current_time", timeStr);
@@ -234,7 +238,7 @@ void LabJackU3Controller::SignalDataStorer::SaveDataToH5File() {
 
     {
       cpptoolkit::SafeHighFiveFile file_safe(temp_path.toStdString(),
-                                             HighFive::File::Create);
+                                             HighFive::File::AccessMode::Create);
       HighFive::File& file = file_safe.get();
       writeMetadataToH5File(file, actual_scan_rate_);
       xt::dump(file, "/0_raw_data/ain_voltage", data.vec_ain_data);
@@ -1315,22 +1319,22 @@ LabJackU3Controller::StreamDataPack LabJackU3Controller::GetStreamDataPack() {
   CHECK_LABJACK_API_ERROR(errorCode, "eGet for LJ_chSTREAM_BACKLOG_UD ",
                           kDefaultLevel);
 
-  {
-    // std::function<std::string(const int_bool&)> int_bool_to_bool_string =
-    //    [](const int_bool& c) -> std::string {
-    //  return std::to_string(static_cast<bool>(c));
-    //};
-    // std::cout << data_pack.vec_ain_data << std::endl;
-    using cpptoolkit::ToStringStream;
-    LOG_TRACE("AIN: \n{}\nShape:{}", data_pack.vec_ain_data,
-              xt::adapt(data_pack.vec_ain_data.shape()));
-    LOG_TRACE("DOUT: \n{}\nShape:{}", data_pack.vec_dout_data,
-              xt::adapt(data_pack.vec_dout_data.shape()));
-    LOG_TRACE("DIN: \n{}\nShape:{}", data_pack.vec_din_data,
-              xt::adapt(data_pack.vec_din_data.shape()));
-    LOG_TRACE("COUNTER: \n{}\nShape:{}", data_pack.vec_counter_data,
-              xt::adapt(data_pack.vec_counter_data.shape()));
-  }
+  //{
+  //  // std::function<std::string(const int_bool&)> int_bool_to_bool_string =
+  //  //    [](const int_bool& c) -> std::string {
+  //  //  return std::to_string(static_cast<bool>(c));
+  //  //};
+  //  // std::cout << data_pack.vec_ain_data << std::endl;
+  //  using cpptoolkit::ToStringStream;
+  //  LOG_TRACE("AIN: \n{}\nShape:{}", data_pack.vec_ain_data,
+  //            xt::adapt(data_pack.vec_ain_data.shape()));
+  //  LOG_TRACE("DOUT: \n{}\nShape:{}", data_pack.vec_dout_data,
+  //            xt::adapt(data_pack.vec_dout_data.shape()));
+  //  LOG_TRACE("DIN: \n{}\nShape:{}", data_pack.vec_din_data,
+  //            xt::adapt(data_pack.vec_din_data.shape()));
+  //  LOG_TRACE("COUNTER: \n{}\nShape:{}", data_pack.vec_counter_data,
+  //            xt::adapt(data_pack.vec_counter_data.shape()));
+  //}
 
   return data_pack;
 }
