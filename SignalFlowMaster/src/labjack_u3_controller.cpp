@@ -8,6 +8,11 @@
 #include <bitset>
 #include <memory>
 
+#include <QJsonDocument>
+#include <QJsonParseError>
+
+#include <zmq.h>
+
 namespace signal_flow_master {
 void LabJackU3Controller::SignalDataStorer::StoreSignalDataAsync(
     const StreamDataPack& data) {
@@ -634,6 +639,7 @@ void LabJackU3Controller::OpenDevice() {
   SetUpDOUTs();
   SetUpCounters();
   SetUpStreamMode();
+  StartNetworkControlListener();
 
   flag_open_ = true;
 
@@ -653,6 +659,7 @@ void LabJackU3Controller::CloseDevice() {
   if (!flag_open_) {
     return;
   }
+  StopNetworkControlListener();
   flag_open_ = false;
   InterruptProtocol();
   StopCollectData();
@@ -661,7 +668,8 @@ void LabJackU3Controller::CloseDevice() {
   LOG_INFO("Close LabJack-U3 {}", kAddress_);
 }
 
-void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
+void LabJackU3Controller::ExecuteOperation(const Operation& operation,
+                                           int run_epoch) {
   LJ_ERROR errorCode;
 
   //// Method one: executive eDO in turn
@@ -679,23 +687,32 @@ void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
   // }
 
   //// Method 2: use PORT method to write all ports
-  if (!flag_execute_protocol_) {
-    return;
+  // Check whether this execution context has been interrupted
+  {
+    std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+    if (protocol_interrupt_epoch_ != run_epoch) {
+      return;
+    }
   }
   emit StartOperation(operation.uuid);
-  errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8,
-                         operation.eioStates.to_ulong(), kNumDOut, 0);
-  CHECK_LABJACK_API_ERROR(
-      errorCode,
-      "Add request to write EIO0-8 states " + operation.eioStates.to_string(),
-      kDefaultLevel);
-  errorCode = GoOne(device_handle_);
-  CHECK_LABJACK_API_ERROR(errorCode, "GoOne to write EIO0-8 states ",
-                          kDefaultLevel);
-  errorCode = GetResult(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8, 0);
-  CHECK_LABJACK_API_ERROR(errorCode, "GetResult to write EIO0-8 states ",
-                          kDefaultLevel);
-  LOG_TRACE("Set EIO0-7 to {}", operation.eioStates.to_string());
+  
+  // Protect LabJack command execution with mutex
+  {
+    std::lock_guard<std::mutex> lock(mutex_labjack_operation_);
+    errorCode = AddRequest(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8,
+                           operation.eioStates.to_ulong(), kNumDOut, 0);
+    CHECK_LABJACK_API_ERROR(
+        errorCode,
+        "Add request to write EIO0-8 states " + operation.eioStates.to_string(),
+        kDefaultLevel);
+    errorCode = GoOne(device_handle_);
+    CHECK_LABJACK_API_ERROR(errorCode, "GoOne to write EIO0-8 states ",
+                            kDefaultLevel);
+    errorCode = GetResult(device_handle_, LJ_ioPUT_DIGITAL_PORT, 8, 0);
+    CHECK_LABJACK_API_ERROR(errorCode, "GetResult to write EIO0-8 states ",
+                            kDefaultLevel);
+  }
+  LOG_INFO("Set EIO7-0 to {}", operation.eioStates.to_string());
 
   // std::this_thread::sleep_for(
   //     std::chrono::milliseconds(operation.duration_in_ms));
@@ -708,28 +725,49 @@ void LabJackU3Controller::ExecuteOperation(const Operation& operation) {
   emit FinishOperation(operation.uuid);
 }
 
-void LabJackU3Controller::ExecuteProtocol(const Protocol& protocol) {
+void LabJackU3Controller::ExecuteProtocol(const Protocol& protocol,
+                                          int run_epoch) {
   for (int r = 0; r < protocol.repetitions || protocol.infinite_repetition;
        r++) {
     for (const auto& op : protocol.operations) {
-      if (!flag_execute_protocol_) {
-        return;
+      // Check whether this execution context has been interrupted
+      {
+        std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+        if (protocol_interrupt_epoch_ != run_epoch) {
+          return;
+        }
       }
-      ExecuteOperation(op);
+      ExecuteOperation(op, run_epoch);
     }
   }
 }
 
 void LabJackU3Controller::ExecuteProtocolList(
     const std::vector<Protocol>& vec_protocol) {
-  flag_execute_protocol_ = true;
-  for (const auto& protocol : vec_protocol) {
-    if (!flag_execute_protocol_) {
-      break;
-    }
-    ExecuteProtocol(protocol);
+  int run_epoch = 0;
+  {
+    std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+    protocol_execution_depth_++;
+    run_epoch = protocol_interrupt_epoch_;
   }
-  flag_execute_protocol_ = false;
+  
+  for (const auto& protocol : vec_protocol) {
+    // Check whether this execution context has been interrupted
+    {
+      std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+      if (protocol_interrupt_epoch_ != run_epoch) {
+        break;
+      }
+    }
+    ExecuteProtocol(protocol, run_epoch);
+  }
+  
+  {
+    std::lock_guard<std::mutex> lock(mutex_protocol_execution_);
+    if (protocol_execution_depth_ > 0) {
+      protocol_execution_depth_--;
+    }
+  }
 }
 
 // void LabJackU3Controller::ExecuteProtocolAsync(const Protocol& protocol) {
@@ -750,6 +788,167 @@ void LabJackU3Controller::ExecuteProtocolListAsync(
   }
   th_protocol_ = std::thread(&LabJackU3Controller::ExecuteProtocolList, this,
                              vec_protocol);
+}
+
+void LabJackU3Controller::StartNetworkControlListener() {
+  std::lock_guard<std::mutex> lock(mutex_network_listener_);
+  if (flag_network_listener_running_) {
+    return;
+  }
+  flag_network_listener_running_ = true;
+  th_network_listener_ =
+      std::thread(&LabJackU3Controller::NetworkControlLoop, this);
+}
+
+void LabJackU3Controller::StopNetworkControlListener() {
+  {
+    std::lock_guard<std::mutex> lock(mutex_network_listener_);
+    flag_network_listener_running_ = false;
+  }
+  if (th_network_listener_.joinable()) {
+    th_network_listener_.join();
+  }
+}
+
+bool LabJackU3Controller::ParseProtocolCommandJson(
+    const std::string& command_json, std::vector<Protocol>* vec_protocols,
+    std::string* error_message) {
+  if (vec_protocols == nullptr) {
+    if (error_message != nullptr) {
+      *error_message = "vec_protocols is nullptr";
+    }
+    return false;
+  }
+
+  vec_protocols->clear();
+  QJsonParseError parse_error;
+  const QJsonDocument doc = QJsonDocument::fromJson(
+      QByteArray::fromStdString(command_json), &parse_error);
+  if (parse_error.error != QJsonParseError::NoError) {
+    if (error_message != nullptr) {
+      *error_message =
+          "Invalid JSON command: " + parse_error.errorString().toStdString();
+    }
+    return false;
+  }
+
+  QJsonObject protocol_root;
+  if (doc.isObject()) {
+    protocol_root = doc.object();
+    if (!protocol_root.contains("protocols")) {
+      QJsonArray protocols_array;
+      protocols_array.append(protocol_root);
+      QJsonObject wrapped;
+      wrapped["protocols"] = protocols_array;
+      protocol_root = wrapped;
+    }
+  } else if (doc.isArray()) {
+    protocol_root["protocols"] = doc.array();
+  } else {
+    if (error_message != nullptr) {
+      *error_message = "JSON root must be object or array";
+    }
+    return false;
+  }
+
+  *vec_protocols = QJsonToProtocolList(protocol_root);
+  if (vec_protocols->empty()) {
+    if (error_message != nullptr) {
+      *error_message = "No valid protocol parsed from command JSON";
+    }
+    return false;
+  }
+
+  return true;
+}
+
+void LabJackU3Controller::AssignOperationUuids(
+    std::vector<Protocol>* vec_protocols) {
+  if (vec_protocols == nullptr) {
+    return;
+  }
+  for (auto& protocol : *vec_protocols) {
+    for (auto& operation : protocol.operations) {
+      operation.uuid = QUuid::createUuid();
+    }
+  }
+}
+
+void LabJackU3Controller::NetworkControlLoop() {
+  void* context = zmq_ctx_new();
+  if (context == nullptr) {
+    LOG_ERROR("Failed to create ZMQ context");
+    return;
+  }
+
+  void* socket = zmq_socket(context, ZMQ_PULL);
+  if (socket == nullptr) {
+    LOG_ERROR("Failed to create ZMQ PULL socket: {}", zmq_strerror(zmq_errno()));
+    zmq_ctx_term(context);
+    return;
+  }
+
+  int recv_timeout_ms = 200;
+  if (zmq_setsockopt(socket, ZMQ_RCVTIMEO, &recv_timeout_ms,
+                     sizeof(recv_timeout_ms)) != 0) {
+    LOG_WARN("Failed to set ZMQ_RCVTIMEO: {}", zmq_strerror(zmq_errno()));
+  }
+
+  const std::string endpoint =
+      fmt::format("tcp://*:{}", kNetworkControlPort_);
+  if (zmq_bind(socket, endpoint.c_str()) != 0) {
+    LOG_ERROR("Failed to bind ZMQ socket on {}: {}", endpoint,
+              zmq_strerror(zmq_errno()));
+    zmq_close(socket);
+    zmq_ctx_term(context);
+    return;
+  }
+
+  LOG_INFO("Network control listener started on {}", endpoint);
+  while (true) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_network_listener_);
+      if (!flag_network_listener_running_) {
+        break;
+      }
+    }
+
+    zmq_msg_t msg;
+    zmq_msg_init(&msg);
+    const int size = zmq_msg_recv(&msg, socket, 0);
+    if (size == -1) {
+      const int err = zmq_errno();
+      zmq_msg_close(&msg);
+      if (err == EAGAIN || err == EINTR) {
+        continue;
+      }
+      LOG_ERROR("ZMQ receive failed: {}", zmq_strerror(err));
+      continue;
+    }
+
+    const char* data_ptr = static_cast<const char*>(zmq_msg_data(&msg));
+    const std::string command_json(data_ptr, data_ptr + size);
+    zmq_msg_close(&msg);
+
+    std::vector<Protocol> vec_protocols;
+    std::string error_message;
+    if (!ParseProtocolCommandJson(command_json, &vec_protocols,
+                                  &error_message)) {
+      LOG_ERROR("Invalid control command: {}", error_message);
+      continue;
+    }
+    LOG_INFO("Received control command: {}", command_json);
+    AssignOperationUuids(&vec_protocols);
+    
+    // Execute the network command immediately in a new thread (don't block the network listener)
+    // Create a copy to avoid use-after-free
+    auto vec_protocols_copy = vec_protocols;
+    std::thread(&LabJackU3Controller::ExecuteProtocolList, this, vec_protocols_copy).detach();
+  }
+
+  zmq_close(socket);
+  zmq_ctx_term(context);
+  LOG_INFO("Network control listener stopped");
 }
 
 LabJackU3Controller::SignalData LabJackU3Controller::CollectOneSignalData() {
